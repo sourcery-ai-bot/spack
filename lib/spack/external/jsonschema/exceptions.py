@@ -128,7 +128,7 @@ class _Error(Exception):
             "message", "cause", "context", "validator", "validator_value",
             "path", "schema_path", "instance", "schema", "parent",
         )
-        return dict((attr, getattr(self, attr)) for attr in attrs)
+        return {attr: getattr(self, attr) for attr in attrs}
 
 
 class ValidationError(_Error):
@@ -288,7 +288,7 @@ class ErrorTree(object):
         return self.total_errors
 
     def __repr__(self):
-        return "<%s (%s total errors)>" % (self.__class__.__name__, len(self))
+        return f"<{self.__class__.__name__} ({len(self)} total errors)>"
 
     @property
     def total_errors(self):

@@ -67,7 +67,5 @@ def itergraphreport(nodes, describe_edge, name="G"):
                 ",".join([(cpatt % item) for item in attribs.items()]),
             )
 
-    for s in do_graph(graph, "\t"):
-        yield s
-
+    yield from do_graph(graph, "\t")
     yield "}\n"

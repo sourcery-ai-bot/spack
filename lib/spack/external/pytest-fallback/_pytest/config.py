@@ -310,7 +310,7 @@ class PytestPluginManager(PluginManager):
         """
         current = py.path.local()
         self._confcutdir = current.join(namespace.confcutdir, abs=True) \
-            if namespace.confcutdir else None
+                if namespace.confcutdir else None
         self._noconftest = namespace.noconftest
         testpaths = namespace.file_or_dir
         foundanchor = False
@@ -407,7 +407,7 @@ class PytestPluginManager(PluginManager):
             name = arg[3:]
             self.set_blocked(name)
             if not name.startswith("pytest_"):
-                self.set_blocked("pytest_" + name)
+                self.set_blocked(f"pytest_{name}")
         else:
             self.import_plugin(arg)
 
@@ -434,10 +434,7 @@ class PytestPluginManager(PluginManager):
         modname = str(modname)
         if self.get_plugin(modname) is not None:
             return
-        if modname in builtin_plugins:
-            importspec = "_pytest." + modname
-        else:
-            importspec = modname
+        importspec = f"_pytest.{modname}" if modname in builtin_plugins else modname
         self.rewrite_hook.mark_rewrite(importspec)
         try:
             __import__(importspec)
@@ -493,9 +490,8 @@ class Parser:
         self.extra_info = {}
 
     def processoption(self, option):
-        if self._processopt:
-            if option.dest:
-                self._processopt(option)
+        if self._processopt and option.dest:
+            self._processopt(option)
 
     def getgroup(self, name, description="", after=None):
         """ get (or create) a named option Group.
@@ -605,10 +601,7 @@ class ArgumentError(Exception):
         self.option_id = str(option)
 
     def __str__(self):
-        if self.option_id:
-            return "option %s: %s" % (self.option_id, self.msg)
-        else:
-            return self.msg
+        return f"option {self.option_id}: {self.msg}" if self.option_id else self.msg
 
 
 class Argument:
@@ -713,31 +706,31 @@ class Argument:
                     "invalid option string %r: "
                     "must be at least two characters long" % opt, self)
             elif len(opt) == 2:
-                if not (opt[0] == "-" and opt[1] != "-"):
+                if opt[0] != "-" or opt[1] == "-":
                     raise ArgumentError(
                         "invalid short option string %r: "
                         "must be of the form -x, (x any non-dash char)" % opt,
                         self)
                 self._short_opts.append(opt)
+            elif opt[:2] != "--" or opt[2] == "-":
+                raise ArgumentError(
+                    "invalid long option string %r: "
+                    "must start with --, followed by non-dash" % opt,
+                    self)
             else:
-                if not (opt[0:2] == "--" and opt[2] != "-"):
-                    raise ArgumentError(
-                        "invalid long option string %r: "
-                        "must start with --, followed by non-dash" % opt,
-                        self)
                 self._long_opts.append(opt)
 
     def __repr__(self):
         args = []
         if self._short_opts:
-            args += ['_short_opts: ' + repr(self._short_opts)]
+            args += [f'_short_opts: {repr(self._short_opts)}']
         if self._long_opts:
-            args += ['_long_opts: ' + repr(self._long_opts)]
-        args += ['dest: ' + repr(self.dest)]
+            args += [f'_long_opts: {repr(self._long_opts)}']
+        args += [f'dest: {repr(self.dest)}']
         if hasattr(self, 'type'):
-            args += ['type: ' + repr(self.type)]
+            args += [f'type: {repr(self.type)}']
         if hasattr(self, 'default'):
-            args += ['default: ' + repr(self.default)]
+            args += [f'default: {repr(self.default)}']
         return 'Argument({0})'.format(', '.join(args))
 
 
@@ -756,10 +749,10 @@ class OptionGroup:
         results in help showing '--two-words' only, but --twowords gets
         accepted **and** the automatic destination is in args.twowords
         """
-        conflict = set(optnames).intersection(
-            name for opt in self.options for name in opt.names())
-        if conflict:
-            raise ValueError("option names %s already added" % conflict)
+        if conflict := set(optnames).intersection(
+            name for opt in self.options for name in opt.names()
+        ):
+            raise ValueError(f"option names {conflict} already added")
         option = Argument(*optnames, **attrs)
         self._addoption_instance(option, shortupper=False)
 
@@ -794,9 +787,8 @@ class MyOptionParser(argparse.ArgumentParser):
         if argv:
             for arg in argv:
                 if arg and arg[0] == '-':
-                    lines = ['unrecognized arguments: %s' % (' '.join(argv))]
-                    for k, v in sorted(self.extra_info.items()):
-                        lines.append('  %s: %s' % (k, v))
+                    lines = [f"unrecognized arguments: {' '.join(argv)}"]
+                    lines.extend(f'  {k}: {v}' for k, v in sorted(self.extra_info.items()))
                     self.error('\n'.join(lines))
             getattr(args, FILE_OR_DIR).extend(argv)
         return args
@@ -816,8 +808,7 @@ class DropShorterLongHelpFormatter(argparse.HelpFormatter):
         orgstr = argparse.HelpFormatter._format_action_invocation(self, action)
         if orgstr and orgstr[0] != '-':  # only optional arguments
             return orgstr
-        res = getattr(action, '_formatted_action_invocation', None)
-        if res:
+        if res := getattr(action, '_formatted_action_invocation', None):
             return res
         options = orgstr.split(', ')
         if len(options) == 2 and (len(options[0]) == 2 or len(options[1]) == 2):
@@ -839,7 +830,7 @@ class DropShorterLongHelpFormatter(argparse.HelpFormatter):
             if xxoption.split()[0] not in option_map:
                 shortened = xxoption.replace('-', '')
                 if shortened not in short_long or \
-                   len(short_long[shortened]) < len(xxoption):
+                       len(short_long[shortened]) < len(xxoption):
                     short_long[shortened] = xxoption
         # now short_long has been filled out to the longest with dashes
         # **and** we keep the right option ordering from add_argument
@@ -889,8 +880,7 @@ def _iter_rewritable_modules(package_files):
             module_name, _ = os.path.splitext(fn)
             yield module_name
         elif is_package:
-            package_name = os.path.dirname(fn)
-            yield package_name
+            yield os.path.dirname(fn)
 
 
 class Config(object):
@@ -958,10 +948,7 @@ class Config(object):
         return self
 
     def notify_exception(self, excinfo, option=None):
-        if option and option.fulltrace:
-            style = "long"
-        else:
-            style = "native"
+        style = "long" if option and option.fulltrace else "native"
         excrepr = excinfo.getrepr(funcargs=True,
                                   showlocals=getattr(option, 'showlocals', False),
                                   style=style,
@@ -994,9 +981,12 @@ class Config(object):
         for name in opt._short_opts + opt._long_opts:
             self._opt2dest[name] = opt.dest
 
-        if hasattr(opt, 'default') and opt.dest:
-            if not hasattr(self.option, opt.dest):
-                setattr(self.option, opt.dest, opt.default)
+        if (
+            hasattr(opt, 'default')
+            and opt.dest
+            and not hasattr(self.option, opt.dest)
+        ):
+            setattr(self.option, opt.dest, opt.default)
 
     @hookimpl(trylast=True)
     def pytest_load_initial_conftests(self, early_config):
@@ -1027,12 +1017,6 @@ class Config(object):
                 hook = _pytest.assertion.install_importhook(self)
             except SystemError:
                 mode = 'plain'
-            else:
-                # REMOVED FOR SPACK: This routine imports `pkg_resources` from
-                # `setuptools`, but we do not need it for Spack. We have removed
-                # it from Spack to avoid a dependency on setuptools.
-                # self._mark_plugins_for_rewrite(hook)
-                pass
         self._warn_about_missing_assertion(mode)
 
     def _warn_about_missing_assertion(self, mode):
@@ -1085,8 +1069,7 @@ class Config(object):
 
     def _checkversion(self):
         import pytest
-        minver = self.inicfg.get('minversion', None)
-        if minver:
+        if minver := self.inicfg.get('minversion', None):
             ver = minver.split(".")
             myver = pytest.__version__.split(".")
             if myver < ver:
@@ -1112,8 +1095,8 @@ class Config(object):
                 cwd = os.getcwd()
                 if cwd == self.rootdir:
                     args = self.getini('testpaths')
-                if not args:
-                    args = [cwd]
+            if not args:
+                args = [cwd]
             self.args = args
         except PrintHelp:
             pass
@@ -1149,21 +1132,16 @@ class Config(object):
             except KeyError:
                 if default is not None:
                     return default
-                if type is None:
-                    return ''
-                return []
-        if type == "pathlist":
-            dp = py.path.local(self.inicfg.config.path).dirpath()
-            values = []
-            for relpath in shlex.split(value):
-                values.append(dp.join(relpath, abs=True))
-            return values
-        elif type == "args":
+                return '' if type is None else []
+        if type == "args":
             return shlex.split(value)
-        elif type == "linelist":
-            return [t for t in map(lambda x: x.strip(), value.split("\n")) if t]
         elif type == "bool":
             return bool(_strtobool(value.strip()))
+        elif type == "linelist":
+            return [t for t in map(lambda x: x.strip(), value.split("\n")) if t]
+        elif type == "pathlist":
+            dp = py.path.local(self.inicfg.config.path).dirpath()
+            return [dp.join(relpath, abs=True) for relpath in shlex.split(value)]
         else:
             assert type is None
             return value
@@ -1278,15 +1256,14 @@ def get_common_ancestor(paths):
             continue
         if common_ancestor is None:
             common_ancestor = path
+        elif path.relto(common_ancestor) or path == common_ancestor:
+            continue
+        elif common_ancestor.relto(path):
+            common_ancestor = path
         else:
-            if path.relto(common_ancestor) or path == common_ancestor:
-                continue
-            elif common_ancestor.relto(path):
-                common_ancestor = path
-            else:
-                shared = path.common(common_ancestor)
-                if shared is not None:
-                    common_ancestor = shared
+            shared = path.common(common_ancestor)
+            if shared is not None:
+                common_ancestor = shared
     if common_ancestor is None:
         common_ancestor = py.path.local()
     elif common_ancestor.isfile():
@@ -1302,9 +1279,7 @@ def get_dirs_from_args(args):
         return str(x).split('::')[0]
 
     def get_dir_from_path(path):
-        if path.isdir():
-            return path
-        return py.path.local(path.dirname)
+        return path if path.isdir() else py.path.local(path.dirname)
 
     # These look like paths but may not exist
     possible_paths = (
@@ -1352,7 +1327,7 @@ def setns(obj, dic):
         if isinstance(value, dict):
             mod = getattr(obj, name, None)
             if mod is None:
-                modname = "pytest.%s" % name
+                modname = f"pytest.{name}"
                 mod = types.ModuleType(modname)
                 sys.modules[modname] = mod
                 mod.__all__ = []
@@ -1373,10 +1348,10 @@ def create_terminal_writer(config, *args, **kwargs):
     and has access to a config object should use this function.
     """
     tw = py.io.TerminalWriter(*args, **kwargs)
-    if config.option.color == 'yes':
-        tw.hasmarkup = True
     if config.option.color == 'no':
         tw.hasmarkup = False
+    elif config.option.color == 'yes':
+        tw.hasmarkup = True
     return tw
 
 

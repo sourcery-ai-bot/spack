@@ -14,10 +14,7 @@ class Error(EnvironmentError):
                                 )
 
     def __str__(self):
-        s = "[%s]: %s" %(self.__class__.__doc__,
-                          " ".join(map(str, self.args)),
-                          )
-        return s
+        return f'[{self.__class__.__doc__}]: {" ".join(map(str, self.args))}'
 
 _winerrnomap = {
     2: errno.ENOENT,
@@ -83,7 +80,6 @@ class ErrorMaker(object):
                 except KeyError:
                     raise value
             raise cls("%s%r" % (func.__name__, args))
-            __tracebackhide__ = True
             
 
 error = ErrorMaker()

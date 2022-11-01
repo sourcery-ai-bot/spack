@@ -49,10 +49,13 @@ def scopeproperty(name=None, doc=None):
         def provide(self):
             if func.__name__ in scope2props[self.scope]:
                 return func(self)
-            raise AttributeError("%s not available in %s-scoped context" % (
-                scopename, self.scope))
+            raise AttributeError(
+                f"{scopename} not available in {self.scope}-scoped context"
+            )
+
 
         return property(provide, None, None, func.__doc__)
+
     return decoratescope
 
 
@@ -160,11 +163,12 @@ def get_parametrized_fixture_keys(item, scopenum):
 
 def reorder_items(items):
     argkeys_cache = {}
-    for scopenum in range(0, scopenum_function):
+    for scopenum in range(scopenum_function):
         argkeys_cache[scopenum] = d = {}
         for item in items:
-            keys = collections.OrderedDict.fromkeys(get_parametrized_fixture_keys(item, scopenum))
-            if keys:
+            if keys := collections.OrderedDict.fromkeys(
+                get_parametrized_fixture_keys(item, scopenum)
+            ):
                 d[item] = keys
     return reorder_items_atscope(items, set(), argkeys_cache, 0)
 
@@ -198,8 +202,9 @@ def slice_items(items, ignore, scoped_argkeys_cache):
         for i, item in enumerate(it):
             argkeys = scoped_argkeys_cache.get(item)
             if argkeys is not None:
-                newargkeys = collections.OrderedDict.fromkeys(k for k in argkeys if k not in ignore)
-                if newargkeys:  # found a slicing key
+                if newargkeys := collections.OrderedDict.fromkeys(
+                    k for k in argkeys if k not in ignore
+                ):
                     slicing_argkey, _ = newargkeys.popitem()
                     items_before = items[:i]
                     items_same = [item]
@@ -232,9 +237,7 @@ def fillfixtures(function):
         request = function._request = FixtureRequest(function)
         request._fillfixtures()
         # prune out funcargs for jstests
-        newfuncargs = {}
-        for name in fi.argnames:
-            newfuncargs[name] = function.funcargs[name]
+        newfuncargs = {name: function.funcargs[name] for name in fi.argnames}
         function.funcargs = newfuncargs
     else:
         request._fillfixtures()
@@ -311,8 +314,7 @@ class FixtureRequest(FuncargnamesCompatAttr):
     @scopeproperty("class")
     def cls(self):
         """ class (can be None) where the test function was collected. """
-        clscol = self._pyfuncitem.getparent(_pytest.python.Class)
-        if clscol:
+        if clscol := self._pyfuncitem.getparent(_pytest.python.Class):
             return clscol.obj
 
     @property
@@ -636,13 +638,12 @@ class FixtureLookupError(LookupError):
             try:
                 lines, _ = inspect.getsourcelines(get_real_func(function))
             except (IOError, IndexError, TypeError):
-                error_msg = "file %s, line %s: source code not available"
-                addline(error_msg % (fspath, lineno + 1))
+                addline(f"file {fspath}, line {lineno + 1}: source code not available")
             else:
-                addline("file %s, line %s" % (fspath, lineno + 1))
-                for i, line in enumerate(lines):
+                addline(f"file {fspath}, line {lineno + 1}")
+                for line in lines:
                     line = line.rstrip()
-                    addline("  " + line)
+                    addline(f"  {line}")
                     if line.lstrip().startswith('def'):
                         break
 
@@ -673,8 +674,7 @@ class FixtureLookupErrorRepr(TerminalRepr):
         # tw.line("FixtureLookupError: %s" %(self.argname), red=True)
         for tbline in self.tblines:
             tw.line(tbline.rstrip())
-        lines = self.errorstring.split("\n")
-        if lines:
+        if lines := self.errorstring.split("\n"):
             tw.line('{0}       {1}'.format(FormattedExcinfo.fail_marker,
                                            lines[0].strip()), red=True)
             for line in lines[1:]:
@@ -686,7 +686,7 @@ class FixtureLookupErrorRepr(TerminalRepr):
 
 def fail_fixturefunc(fixturefunc, msg):
     fs, lineno = getfslineno(fixturefunc)
-    location = "%s:%s" % (fs, lineno + 1)
+    location = f"{fs}:{lineno + 1}"
     source = _pytest._code.Source(fixturefunc)
     fail(msg + ":\n\n" + str(source.indent()) + "\n" + location,
          pytrace=False)
@@ -730,7 +730,7 @@ class FixtureDef:
             where=baseid
         )
         self.params = params
-        startindex = unittest and 1 or None
+        startindex = 1 if unittest else None
         self.argnames = getfuncargnames(func, startindex=startindex)
         self.unittest = unittest
         self.ids = ids
@@ -801,15 +801,11 @@ def pytest_fixture_setup(fixturedef, request):
         kwargs[argname] = result
 
     fixturefunc = fixturedef.func
-    if fixturedef.unittest:
-        if request.instance is not None:
+    if request.instance is not None:
+        if fixturedef.unittest:
             # bind the unbound method to the TestCase instance
             fixturefunc = fixturedef.func.__get__(request.instance)
-    else:
-        # the fixture function needs to be bound to the actual
-        # request.instance so that code working with "fixturedef" behaves
-        # as expected.
-        if request.instance is not None:
+        else:
             fixturefunc = getimfunc(fixturedef.func)
             if fixturefunc != fixturedef.func:
                 fixturefunc = fixturefunc.__get__(request.instance)
@@ -1032,26 +1028,26 @@ class FixtureManager:
 
     def pytest_generate_tests(self, metafunc):
         for argname in metafunc.fixturenames:
-            faclist = metafunc._arg2fixturedefs.get(argname)
-            if faclist:
-                fixturedef = faclist[-1]
-                if fixturedef.params is not None:
-                    parametrize_func = getattr(metafunc.function, 'parametrize', None)
-                    func_params = getattr(parametrize_func, 'args', [[None]])
-                    func_kwargs = getattr(parametrize_func, 'kwargs', {})
-                    # skip directly parametrized arguments
-                    if "argnames" in func_kwargs:
-                        argnames = parametrize_func.kwargs["argnames"]
-                    else:
-                        argnames = func_params[0]
-                    if not isinstance(argnames, (tuple, list)):
-                        argnames = [x.strip() for x in argnames.split(",") if x.strip()]
-                    if argname not in func_params and argname not in argnames:
-                        metafunc.parametrize(argname, fixturedef.params,
-                                             indirect=True, scope=fixturedef.scope,
-                                             ids=fixturedef.ids)
-            else:
+            if not (faclist := metafunc._arg2fixturedefs.get(argname)):
                 continue  # will raise FixtureLookupError at setup time
+            fixturedef = faclist[-1]
+            if fixturedef.params is not None:
+                parametrize_func = getattr(metafunc.function, 'parametrize', None)
+                func_params = getattr(parametrize_func, 'args', [[None]])
+                func_kwargs = getattr(parametrize_func, 'kwargs', {})
+                    # skip directly parametrized arguments
+                argnames = (
+                    parametrize_func.kwargs["argnames"]
+                    if "argnames" in func_kwargs
+                    else func_params[0]
+                )
+
+                if not isinstance(argnames, (tuple, list)):
+                    argnames = [x.strip() for x in argnames.split(",") if x.strip()]
+                if argname not in func_params and argname not in argnames:
+                    metafunc.parametrize(argname, fixturedef.params,
+                                         indirect=True, scope=fixturedef.scope,
+                                         ids=fixturedef.ids)
 
     def pytest_collection_modifyitems(self, items):
         # separate parametrized setups
@@ -1091,7 +1087,7 @@ class FixtureManager:
                 if marker.name:
                     name = marker.name
                 msg = 'fixtures cannot have "pytest_funcarg__" prefix ' \
-                      'and be decorated with @pytest.fixture:\n%s' % name
+                          'and be decorated with @pytest.fixture:\n%s' % name
                 assert not name.startswith(self._argprefix), msg
 
             fixture_def = FixtureDef(self, nodeid, name, obj,

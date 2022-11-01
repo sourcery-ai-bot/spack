@@ -144,7 +144,7 @@ class BytecodeCache(object):
         """Returns the unique hash key for this template name."""
         hash = sha1(name.encode("utf-8"))
         if filename is not None:
-            filename = "|" + filename
+            filename = f"|{filename}"
             if isinstance(filename, text_type):
                 filename = filename.encode("utf-8")
             hash.update(filename)

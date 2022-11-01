@@ -27,9 +27,8 @@ except NameError:
             i = self.remaining
             if i > 0:
                 i -= 1
-                item = self.seq[i]
                 self.remaining = i
-                return item
+                return self.seq[i]
             raise StopIteration
 
         def __length_hint__(self):
@@ -39,19 +38,13 @@ try:
     any = any
 except NameError:
     def any(iterable):
-        for x in iterable:
-            if x:
-                return True
-        return False
+        return any(iterable)
 
 try:
     all = all
 except NameError:
     def all(iterable):
-        for x in iterable:
-            if not x:
-                return False
-        return True
+        return all(iterable)
 
 try:
     sorted = sorted
@@ -78,9 +71,7 @@ except NameError:
             l.sort()
         if reverse:
             l.reverse()
-        if key is not None:
-            return [element for (_, element) in l]
-        return l
+        return [element for (_, element) in l] if key is not None else l
 
 try:
     set, frozenset = set, frozenset
@@ -121,10 +112,7 @@ if sys.version_info >= (3, 0):
     _basestring = str
     def _totext(obj, encoding=None, errors=None):
         if isinstance(obj, bytes):
-            if errors is None:
-                obj = obj.decode(encoding)
-            else:
-                obj = obj.decode(encoding, errors)
+            obj = obj.decode(encoding) if errors is None else obj.decode(encoding, errors)
         elif not isinstance(obj, str):
             obj = str(obj)
         return obj
@@ -190,16 +178,12 @@ else:
 
     def print_(*args, **kwargs):
         """ minimal backport of py3k print statement. """
-        sep = ' '
-        if 'sep' in kwargs:
-            sep = kwargs.pop('sep')
-        end = '\n'
-        if 'end' in kwargs:
-            end = kwargs.pop('end')
+        sep = kwargs.pop('sep') if 'sep' in kwargs else ' '
+        end = kwargs.pop('end') if 'end' in kwargs else '\n'
         file = 'file' in kwargs and kwargs.pop('file') or sys.stdout
         if kwargs:
             args = ", ".join([str(x) for x in kwargs])
-            raise TypeError("invalid keyword arguments: %s" % args)
+            raise TypeError(f"invalid keyword arguments: {args}")
         at_start = True
         for x in args:
             if not at_start:

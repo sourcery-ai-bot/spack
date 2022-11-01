@@ -166,10 +166,7 @@ class Dot(object):
 
         seen = set()
         for node in nodes:
-            if nodevisitor is None:
-                style = {}
-            else:
-                style = nodevisitor(node)
+            style = {} if nodevisitor is None else nodevisitor(node)
             if style is not None:
                 self.nodes[node] = {}
                 self.node_style(node, **style)
@@ -177,10 +174,7 @@ class Dot(object):
         if edgefn is not None:
             for head in seen:
                 for tail in (n for n in edgefn(head) if n in seen):
-                    if edgevisitor is None:
-                        edgestyle = {}
-                    else:
-                        edgestyle = edgevisitor(head, tail)
+                    edgestyle = {} if edgevisitor is None else edgevisitor(head, tail)
                     if edgestyle is not None:
                         if head not in self.edges:
                             self.edges[head] = {}
@@ -200,12 +194,12 @@ class Dot(object):
 
         if mode == "neato":
             self.save_dot(self.temp_neo)
-            neato_cmd = "%s -o %s %s" % (self.neato, self.temp_dot, self.temp_neo)
+            neato_cmd = f"{self.neato} -o {self.temp_dot} {self.temp_neo}"
             os.system(neato_cmd)
         else:
             self.save_dot(self.temp_dot)
 
-        plot_cmd = "%s %s" % (self.dotty, self.temp_dot)
+        plot_cmd = f"{self.dotty} {self.temp_dot}"
         os.system(plot_cmd)
 
     def node_style(self, node, **kwargs):
@@ -228,14 +222,14 @@ class Dot(object):
         Modifies an edge style to the dot representation.
         """
         if tail not in self.nodes:
-            raise GraphError("invalid node %s" % (tail,))
+            raise GraphError(f"invalid node {tail}")
 
         try:
             if tail not in self.edges[head]:
                 self.edges[head][tail] = {}
             self.edges[head][tail] = kwargs
         except KeyError:
-            raise GraphError("invalid edge  %s -> %s " % (head, tail))
+            raise GraphError(f"invalid edge  {head} -> {tail} ")
 
     def iterdot(self):
         # write graph title
@@ -245,7 +239,7 @@ class Dot(object):
             yield "graph %s {\n" % (self.name,)
 
         else:
-            raise GraphError("unsupported graphtype %s" % (self.type,))
+            raise GraphError(f"unsupported graphtype {self.type}")
 
         # write overall graph attributes
         for attr_name, attr_value in sorted(self.attr.items()):
@@ -304,18 +298,11 @@ class Dot(object):
 
         if mode == "neato":
             self.save_dot(self.temp_neo)
-            neato_cmd = "%s -o %s %s" % (self.neato, self.temp_dot, self.temp_neo)
+            neato_cmd = f"{self.neato} -o {self.temp_dot} {self.temp_neo}"
             os.system(neato_cmd)
-            plot_cmd = self.dot
         else:
             self.save_dot(self.temp_dot)
-            plot_cmd = self.dot
-
-        file_name = "%s.%s" % (file_name, file_type)
-        create_cmd = "%s -T%s %s -o %s" % (
-            plot_cmd,
-            file_type,
-            self.temp_dot,
-            file_name,
-        )
+        plot_cmd = self.dot
+        file_name = f"{file_name}.{file_type}"
+        create_cmd = f"{plot_cmd} -T{file_type} {self.temp_dot} -o {file_name}"
         os.system(create_cmd)

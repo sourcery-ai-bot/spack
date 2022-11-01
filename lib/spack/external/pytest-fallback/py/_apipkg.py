@@ -16,20 +16,15 @@ def _py_abspath(path):
     special version of abspath
     that will leave paths from jython jars alone
     """
-    if path.startswith('__pyclasspath__'):
-
-        return path
-    else:
-        return os.path.abspath(path)
+    return path if path.startswith('__pyclasspath__') else os.path.abspath(path)
 
 def initpkg(pkgname, exportdefs, attr=dict()):
     """ initialize given package from the export definitions. """
     oldmod = sys.modules.get(pkgname)
-    d = {}
     f = getattr(oldmod, '__file__', None)
     if f:
         f = _py_abspath(f)
-    d['__file__'] = f
+    d = {'__file__': f}
     if hasattr(oldmod, '__version__'):
         d['__version__'] = oldmod.__version__
     if hasattr(oldmod, '__loader__'):
@@ -38,7 +33,7 @@ def initpkg(pkgname, exportdefs, attr=dict()):
         d['__path__'] = [_py_abspath(p) for p in oldmod.__path__]
     if '__doc__' not in exportdefs and getattr(oldmod, '__doc__', None):
         d['__doc__'] = oldmod.__doc__
-    d.update(attr)
+    d |= attr
     if hasattr(oldmod, "__dict__"):
         oldmod.__dict__.update(d)
     mod = ApiModule(pkgname, exportdefs, implprefix=pkgname, attr=d)
@@ -77,7 +72,7 @@ class ApiModule(ModuleType):
                 setattr(self, name, val)
         for name, importspec in importspec.items():
             if isinstance(importspec, dict):
-                subname = '%s.%s' % (self.__name__, name)
+                subname = f'{self.__name__}.{name}'
                 apimod = ApiModule(subname, importspec, implprefix)
                 sys.modules[subname] = apimod
                 setattr(self, name, apimod)
@@ -89,7 +84,7 @@ class ApiModule(ModuleType):
                     modpath = implprefix + modpath
 
                 if not attrname:
-                    subname = '%s.%s' % (self.__name__, name)
+                    subname = f'{self.__name__}.{name}'
                     apimod = AliasModule(subname, modpath)
                     sys.modules[subname] = apimod
                     if '.' not in name:
@@ -100,9 +95,9 @@ class ApiModule(ModuleType):
     def __repr__(self):
         l = []
         if hasattr(self, '__version__'):
-            l.append("version=" + repr(self.__version__))
+            l.append(f"version={repr(self.__version__)}")
         if hasattr(self, '__file__'):
-            l.append('from ' + repr(self.__file__))
+            l.append(f'from {repr(self.__file__)}')
         if l:
             return '<ApiModule %r %s>' % (self.__name__, " ".join(l))
         return '<ApiModule %r>' % (self.__name__,)
@@ -158,12 +153,14 @@ def AliasModule(modname, modpath, attrname=None):
             mod.append(x)
         return mod[0]
 
+
+
     class AliasModule(ModuleType):
 
         def __repr__(self):
             x = modpath
             if attrname:
-                x += "." + attrname
+                x += f".{attrname}"
             return '<AliasModule %r for %r>' % (modname, x)
 
         def __getattribute__(self, name):
@@ -177,5 +174,6 @@ def AliasModule(modname, modpath, attrname=None):
 
         def __delattr__(self, name):
             delattr(getmod(), name)
+
 
     return AliasModule(str(modname))

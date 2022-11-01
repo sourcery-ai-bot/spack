@@ -47,7 +47,7 @@ sys.path.append(os.path.abspath("_spack_root/lib/spack/"))
 
 # Add the Spack bin directory to the path so that we can use its output in docs.
 os.environ["SPACK_ROOT"] = os.path.abspath("_spack_root")
-os.environ["PATH"] += "%s%s" % (os.pathsep, os.path.abspath("_spack_root/bin"))
+os.environ["PATH"] += f'{os.pathsep}{os.path.abspath("_spack_root/bin")}'
 
 # Set an environment variable so that colify will print output like it would to
 # a terminal.

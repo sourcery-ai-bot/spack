@@ -58,10 +58,7 @@ _py_ext_re = re.compile(r"\.py$")
 def bin_xml_escape(arg):
     def repl(matchobj):
         i = ord(matchobj.group())
-        if i <= 0xFF:
-            return unicode('#x%02X') % i
-        else:
-            return unicode('#x%04X') % i
+        return unicode('#x%02X') % i if i <= 0xFF else unicode('#x%04X') % i
 
     return py.xml.raw(illegal_xml_re.sub(repl, py.xml.escape(arg)))
 
@@ -126,9 +123,8 @@ class _NodeReporter(object):
 
     def write_captured_output(self, report):
         for capname in ('out', 'err'):
-            content = getattr(report, 'capstd' + capname)
-            if content:
-                tag = getattr(Junit, 'system-' + capname)
+            if content := getattr(report, f'capstd{capname}'):
+                tag = getattr(Junit, f'system-{capname}')
                 self.append(tag(bin_xml_escape(content)))
 
     def append_pass(self, report):
@@ -179,9 +175,13 @@ class _NodeReporter(object):
             if skipreason.startswith("Skipped: "):
                 skipreason = bin_xml_escape(skipreason[9:])
             self.append(
-                Junit.skipped("%s:%s: %s" % (filename, lineno, skipreason),
-                              type="pytest.skip",
-                              message=skipreason))
+                Junit.skipped(
+                    f"{filename}:{lineno}: {skipreason}",
+                    type="pytest.skip",
+                    message=skipreason,
+                )
+            )
+
         self.write_captured_output(report)
 
     def finalize(self):
@@ -239,8 +239,7 @@ def pytest_configure(config):
 
 
 def pytest_unconfigure(config):
-    xml = getattr(config, '_xml', None)
-    if xml:
+    if xml := getattr(config, '_xml', None):
         del config._xml
         config.pluginmanager.unregister(xml)
 
@@ -347,14 +346,18 @@ class LogXML(object):
                 # The following vars are needed when xdist plugin is used
                 report_wid = getattr(report, "worker_id", None)
                 report_ii = getattr(report, "item_index", None)
-                close_report = next(
-                    (rep for rep in self.open_reports
-                     if (rep.nodeid == report.nodeid and
-                         getattr(rep, "item_index", None) == report_ii and
-                         getattr(rep, "worker_id", None) == report_wid
-                         )
-                     ), None)
-                if close_report:
+                if close_report := next(
+                    (
+                        rep
+                        for rep in self.open_reports
+                        if (
+                            rep.nodeid == report.nodeid
+                            and getattr(rep, "item_index", None) == report_ii
+                            and getattr(rep, "worker_id", None) == report_wid
+                        )
+                    ),
+                    None,
+                ):
                     # We need to open new testcase in case we have failure in
                     # call and error in teardown in order to follow junit
                     # schema
@@ -376,14 +379,18 @@ class LogXML(object):
             self.finalize(report)
             report_wid = getattr(report, "worker_id", None)
             report_ii = getattr(report, "item_index", None)
-            close_report = next(
-                (rep for rep in self.open_reports
-                 if (rep.nodeid == report.nodeid and
-                     getattr(rep, "item_index", None) == report_ii and
-                     getattr(rep, "worker_id", None) == report_wid
-                     )
-                 ), None)
-            if close_report:
+            if close_report := next(
+                (
+                    rep
+                    for rep in self.open_reports
+                    if (
+                        rep.nodeid == report.nodeid
+                        and getattr(rep, "item_index", None) == report_ii
+                        and getattr(rep, "worker_id", None) == report_wid
+                    )
+                ),
+                None,
+            ):
                 self.open_reports.remove(close_report)
 
     def update_testcase_duration(self, report):
@@ -413,29 +420,27 @@ class LogXML(object):
         dirname = os.path.dirname(os.path.abspath(self.logfile))
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
-        logfile = open(self.logfile, 'w', encoding='utf-8')
-        suite_stop_time = time.time()
-        suite_time_delta = suite_stop_time - self.suite_start_time
+        with open(self.logfile, 'w', encoding='utf-8') as logfile:
+            suite_stop_time = time.time()
+            suite_time_delta = suite_stop_time - self.suite_start_time
 
-        numtests = (self.stats['passed'] + self.stats['failure'] +
-                    self.stats['skipped'] + self.stats['error'] -
-                    self.cnt_double_fail_tests)
-        logfile.write('<?xml version="1.0" encoding="utf-8"?>')
+            numtests = (self.stats['passed'] + self.stats['failure'] +
+                        self.stats['skipped'] + self.stats['error'] -
+                        self.cnt_double_fail_tests)
+            logfile.write('<?xml version="1.0" encoding="utf-8"?>')
 
-        logfile.write(Junit.testsuite(
-            self._get_global_properties_node(),
-            [x.to_xml() for x in self.node_reporters_ordered],
-            name=self.suite_name,
-            errors=self.stats['error'],
-            failures=self.stats['failure'],
-            skips=self.stats['skipped'],
-            tests=numtests,
-            time="%.3f" % suite_time_delta, ).unicode(indent=0))
-        logfile.close()
+            logfile.write(Junit.testsuite(
+                self._get_global_properties_node(),
+                [x.to_xml() for x in self.node_reporters_ordered],
+                name=self.suite_name,
+                errors=self.stats['error'],
+                failures=self.stats['failure'],
+                skips=self.stats['skipped'],
+                tests=numtests,
+                time="%.3f" % suite_time_delta, ).unicode(indent=0))
 
     def pytest_terminal_summary(self, terminalreporter):
-        terminalreporter.write_sep("-",
-                                   "generated xml file: %s" % (self.logfile))
+        terminalreporter.write_sep("-", f"generated xml file: {self.logfile}")
 
     def add_global_property(self, name, value):
         self.global_properties.append((str(name), bin_xml_escape(value)))

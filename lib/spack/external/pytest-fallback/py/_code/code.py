@@ -375,9 +375,8 @@ class ExceptionInfo(object):
         lines = format_exception_only(self.type, self.value)
         text = ''.join(lines)
         text = text.rstrip()
-        if tryshort:
-            if text.startswith(self._striptext):
-                text = text[len(self._striptext):]
+        if tryshort and text.startswith(self._striptext):
+            text = text[len(self._striptext):]
         return text
 
     def errisinstance(self, exc):
@@ -462,9 +461,11 @@ class FormattedExcinfo(object):
 
     def repr_args(self, entry):
         if self.funcargs:
-            args = []
-            for argname, argvalue in entry.frame.getargs(var=True):
-                args.append((argname, self._saferepr(argvalue)))
+            args = [
+                (argname, self._saferepr(argvalue))
+                for argname, argvalue in entry.frame.getargs(var=True)
+            ]
+
             return ReprFuncArgs(args)
 
     def get_source(self, source, line_index=-1, excinfo=None, short=False):
@@ -479,11 +480,9 @@ class FormattedExcinfo(object):
         if short:
             lines.append(space_prefix + source.lines[line_index].strip())
         else:
-            for line in source.lines[:line_index]:
-                lines.append(space_prefix + line)
-            lines.append(self.flow_marker + "   " + source.lines[line_index])
-            for line in source.lines[line_index+1:]:
-                lines.append(space_prefix + line)
+            lines.extend(space_prefix + line for line in source.lines[:line_index])
+            lines.append(f"{self.flow_marker}   {source.lines[line_index]}")
+            lines.extend(space_prefix + line for line in source.lines[line_index+1:])
         if excinfo is not None:
             indent = 4 if short else self._getindent(source)
             lines.extend(self.get_exconly(excinfo, indent=indent, markall=True))
@@ -539,18 +538,13 @@ class FormattedExcinfo(object):
             style = self.style
         if style in ("short", "long"):
             short = style == "short"
-            reprargs = self.repr_args(entry) if not short else None
+            reprargs = None if short else self.repr_args(entry)
             s = self.get_source(source, line_index, excinfo, short=short)
             lines.extend(s)
-            if short:
-                message = "in %s" %(entry.name)
-            else:
-                message = excinfo and excinfo.typename or ""
+            message = f"in {entry.name}" if short else excinfo and excinfo.typename or ""
             path = self._makepath(entry.path)
             filelocrepr = ReprFileLocation(path, entry.lineno+1, message)
-            localsrepr = None
-            if not short:
-                localsrepr =  self.repr_locals(entry.locals)
+            localsrepr = None if short else self.repr_locals(entry.locals)
             return ReprEntry(lines, reprargs, localsrepr, filelocrepr, style)
         if excinfo:
             lines.extend(self.get_exconly(excinfo, indent=4))
@@ -571,9 +565,10 @@ class FormattedExcinfo(object):
         if self.tbfilter:
             traceback = traceback.filter()
         recursionindex = None
-        if excinfo.errisinstance(RuntimeError):
-            if "maximum recursion depth exceeded" in str(excinfo.value):
-                recursionindex = traceback.recursionindex()
+        if excinfo.errisinstance(
+            RuntimeError
+        ) and "maximum recursion depth exceeded" in str(excinfo.value):
+            recursionindex = traceback.recursionindex()
         last = traceback[-1]
         entries = []
         extraline = None
@@ -714,7 +709,7 @@ class ReprFileLocation(TerminalRepr):
         i = msg.find("\n")
         if i != -1:
             msg = msg[:i]
-        tw.line("%s:%s: %s" %(self.path, self.lineno, msg))
+        tw.line(f"{self.path}:{self.lineno}: {msg}")
 
 class ReprLocals(TerminalRepr):
     def __init__(self, lines):
@@ -729,22 +724,22 @@ class ReprFuncArgs(TerminalRepr):
         self.args = args
 
     def toterminal(self, tw):
-        if self.args:
-            linesofar = ""
-            for name, value in self.args:
-                ns = "%s = %s" %(name, value)
-                if len(ns) + len(linesofar) + 2 > tw.fullwidth:
-                    if linesofar:
-                        tw.line(linesofar)
-                    linesofar =  ns
-                else:
-                    if linesofar:
-                        linesofar += ", " + ns
-                    else:
-                        linesofar = ns
-            if linesofar:
-                tw.line(linesofar)
-            tw.line("")
+        if not self.args:
+            return
+        linesofar = ""
+        for name, value in self.args:
+            ns = f"{name} = {value}"
+            if len(ns) + len(linesofar) + 2 > tw.fullwidth:
+                if linesofar:
+                    tw.line(linesofar)
+                linesofar =  ns
+            elif linesofar:
+                linesofar += f", {ns}"
+            else:
+                linesofar = ns
+        if linesofar:
+            tw.line(linesofar)
+        tw.line("")
 
 
 
@@ -778,10 +773,14 @@ def getrawcode(obj, trycall=True):
         obj = getattr(obj, 'func_code', obj)
         obj = getattr(obj, 'f_code', obj)
         obj = getattr(obj, '__code__', obj)
-        if trycall and not hasattr(obj, 'co_firstlineno'):
-            if hasattr(obj, '__call__') and not py.std.inspect.isclass(obj):
-                x = getrawcode(obj.__call__, trycall=False)
-                if hasattr(x, 'co_firstlineno'):
-                    return x
+        if (
+            trycall
+            and not hasattr(obj, 'co_firstlineno')
+            and hasattr(obj, '__call__')
+            and not py.std.inspect.isclass(obj)
+        ):
+            x = getrawcode(obj.__call__, trycall=False)
+            if hasattr(x, 'co_firstlineno'):
+                return x
         return obj
 

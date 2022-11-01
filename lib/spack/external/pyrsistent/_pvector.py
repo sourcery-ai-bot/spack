@@ -19,10 +19,7 @@ def compare_pvector(v, other, operator):
 
 
 def _index_or_slice(index, stop):
-    if stop is None:
-        return index
-
-    return slice(index, stop)
+    return index if stop is None else slice(index, stop)
 
 
 class PythonPVector(object):
@@ -97,10 +94,7 @@ class PythonPVector(object):
         if times <= 0 or self is _EMPTY_PVECTOR:
             return _EMPTY_PVECTOR
 
-        if times == 1:
-            return self
-
-        return _EMPTY_PVECTOR.extend(times * self.tolist())
+        return self if times == 1 else _EMPTY_PVECTOR.extend(times * self.tolist())
 
     __rmul__ = __mul__
 
@@ -198,8 +192,7 @@ class PythonPVector(object):
                 index += self._count + len(self._extra_tail)
 
             if 0 <= index < self._count:
-                node = self._cached_leafs.get(index >> SHIFT)
-                if node:
+                if node := self._cached_leafs.get(index >> SHIFT):
                     node[index & BIT_MASK] = val
                 elif index >= self._tail_offset:
                     if id(self._tail) not in self._dirty_nodes:
@@ -214,7 +207,7 @@ class PythonPVector(object):
             elif index == self._count + len(self._extra_tail):
                 self._extra_tail.append(val)
             else:
-                raise IndexError("Index out of range: %s" % (index,))
+                raise IndexError(f"Index out of range: {index}")
 
         def _do_set(self, level, node, i, val):
             if id(node) in self._dirty_nodes:
@@ -285,7 +278,7 @@ class PythonPVector(object):
         if i == self._count:
             return self.append(val)
 
-        raise IndexError("Index out of range: %s" % (i,))
+        raise IndexError(f"Index out of range: {i}")
 
     def _do_set(self, level, node, i, val):
         ret = list(node)
@@ -309,7 +302,7 @@ class PythonPVector(object):
 
             return node
 
-        raise IndexError("Index out of range: %s" % (i,))
+        raise IndexError(f"Index out of range: {i}")
 
     def _create_new_root(self):
         new_shift = self._shift
@@ -334,10 +327,7 @@ class PythonPVector(object):
         return PythonPVector(self._count + 1, new_shift, new_root, [val])
 
     def _new_path(self, level, node):
-        if level == 0:
-            return node
-
-        return [self._new_path(level - SHIFT, node)]
+        return node if level == 0 else [self._new_path(level - SHIFT, node)]
 
     def _mutating_insert_tail(self):
         self._root, self._shift = self._create_new_root()

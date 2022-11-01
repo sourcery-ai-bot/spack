@@ -11,14 +11,14 @@ gCommand = None
 
 def check_file(fp, path, callback):
     if not os.path.exists(path):
-        print("%s: %s: No such file or directory" % (gCommand, path), file=sys.stderr)
+        print(f"{gCommand}: {path}: No such file or directory", file=sys.stderr)
         return 1
 
     try:
         is_plat = is_platform_file(path)
 
     except IOError as msg:
-        print("%s: %s: %s" % (gCommand, path, msg), file=sys.stderr)
+        print(f"{gCommand}: {path}: {msg}", file=sys.stderr)
         return 1
 
     else:

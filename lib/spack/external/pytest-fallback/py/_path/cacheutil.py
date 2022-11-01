@@ -101,8 +101,7 @@ class AgingCache(BasicCache):
 
     def _build(self, key, builder):
         val = builder()
-        entry = AgingEntry(val, gettime() + self.maxseconds)
-        return entry
+        return AgingEntry(val, gettime() + self.maxseconds)
 
 class AgingEntry(object):
     def __init__(self, value, expirationtime):

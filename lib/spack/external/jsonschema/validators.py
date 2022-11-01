@@ -74,9 +74,8 @@ def _generate_legacy_type_checks(types=()):
         pytypes = _utils.flatten(pytypes)
 
         def type_check(checker, instance):
-            if isinstance(instance, bool):
-                if bool not in pytypes:
-                    return False
+            if isinstance(instance, bool) and bool not in pytypes:
+                return False
             return isinstance(instance, pytypes)
 
         return type_check
@@ -151,9 +150,7 @@ class _DefaultTypesDeprecatingMetaClass(type):
 
 
 def _id_of(schema):
-    if schema is True or schema is False:
-        return u""
-    return schema.get(u"$id", u"")
+    return u"" if schema is True or schema is False else schema.get(u"$id", u"")
 
 
 def create(
@@ -247,6 +244,8 @@ def create(
         else:
             _created_with_default_types = None
 
+
+
     @add_metaclass(_DefaultTypesDeprecatingMetaClass)
     class Validator(object):
 
@@ -314,11 +313,7 @@ def create(
                 self.resolver.push_scope(scope)
             try:
                 ref = _schema.get(u"$ref")
-                if ref is not None:
-                    validators = [(u"$ref", ref)]
-                else:
-                    validators = iteritems(_schema)
-
+                validators = [(u"$ref", ref)] if ref is not None else iteritems(_schema)
                 for k, v in validators:
                     validator = self.VALIDATORS.get(k)
                     if validator is None:
@@ -361,6 +356,7 @@ def create(
         def is_valid(self, instance, _schema=None):
             error = next(self.iter_errors(instance, _schema), None)
             return error is None
+
 
     if version is not None:
         Validator = validates(version)(Validator)
@@ -423,7 +419,7 @@ def extend(validator, validators=(), version=None, type_checker=None):
     """
 
     all_validators = dict(validator.VALIDATORS)
-    all_validators.update(validators)
+    all_validators |= validators
 
     if type_checker is None:
         type_checker = validator.TYPE_CHECKER
@@ -803,10 +799,8 @@ class RefResolver(object):
 
             if isinstance(document, Sequence):
                 # Array indexes should be turned into integers
-                try:
+                with contextlib.suppress(ValueError):
                     part = int(part)
-                except ValueError:
-                    pass
             try:
                 document = document[part]
             except (TypeError, LookupError):

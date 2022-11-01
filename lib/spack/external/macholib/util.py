@@ -7,9 +7,10 @@ import sys
 from macholib import mach_o
 
 MAGIC = [
-    struct.pack("!L", getattr(mach_o, "MH_" + _))
+    struct.pack("!L", getattr(mach_o, f"MH_{_}"))
     for _ in ["MAGIC", "CIGAM", "MAGIC_64", "CIGAM_64"]
 ]
+
 FAT_MAGIC_BYTES = struct.pack("!L", mach_o.FAT_MAGIC)
 MAGIC_LEN = 4
 STRIPCMD = ["/usr/bin/strip", "-x", "-S", "-"]
@@ -180,9 +181,7 @@ def in_system_path(filename):
     if fn.startswith("/usr/local/"):
         return False
     elif fn.startswith("/System/") or fn.startswith("/usr/"):
-        if fn in NOT_SYSTEM_FILES:
-            return False
-        return True
+        return fn not in NOT_SYSTEM_FILES
     else:
         return False
 
@@ -221,10 +220,7 @@ def is_platform_file(path):
             fileobj.seek(arch.offset)
             # Read magic off the first header
             bytes = fileobj.read(MAGIC_LEN)
-    for magic in MAGIC:
-        if bytes == magic:
-            return True
-    return False
+    return any(bytes == magic for magic in MAGIC)
 
 
 def iter_platform_files(dst):

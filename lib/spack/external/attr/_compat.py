@@ -93,7 +93,7 @@ if PY2:
 
         def __repr__(self):
             # Override to be identical to the Python 3 version.
-            return "mappingproxy(" + repr(self.data) + ")"
+            return f"mappingproxy({repr(self.data)})"
 
     def metadata_proxy(d):
         res = ReadOnlyDict()
@@ -157,19 +157,10 @@ def make_set_closure_cell():
         x = value
         return
 
-        # This function will be eliminated as dead code, but
-        # not before its reference to `x` forces `x` to be
-        # represented as a closure cell rather than a local.
-        def force_x_to_be_a_cell():  # pragma: no cover
-            return x
-
     try:
         # Extract the code object and make sure our assumptions about
         # the closure behavior are correct.
-        if PY2:
-            co = set_first_cellvar_to.func_code
-        else:
-            co = set_first_cellvar_to.__code__
+        co = set_first_cellvar_to.func_code if PY2 else set_first_cellvar_to.__code__
         if co.co_cellvars != ("x",) or co.co_freevars != ():
             raise AssertionError  # pragma: no cover
 

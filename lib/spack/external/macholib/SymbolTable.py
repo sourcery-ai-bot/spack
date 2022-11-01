@@ -77,18 +77,15 @@ class SymbolTable(object):
         self.undefsyms = nlists[
             cmd.iundefsym : cmd.iundefsym + cmd.nundefsym  # noqa: E203
         ]
-        if cmd.tocoff == 0:
-            self.toc = None
-        else:
-            self.toc = self.readtoc(fh, cmd.tocoff, cmd.ntoc)
+        self.toc = None if cmd.tocoff == 0 else self.readtoc(fh, cmd.tocoff, cmd.ntoc)
 
     def readtoc(self, fh, off, n):
         fh.seek(self.macho_header.offset + off)
-        return [dylib_table_of_contents.from_fileobj(fh) for i in range(n)]
+        return [dylib_table_of_contents.from_fileobj(fh) for _ in range(n)]
 
     def readmodtab(self, fh, off, n):
         fh.seek(self.macho_header.offset + off)
-        return [dylib_module.from_fileobj(fh) for i in range(n)]
+        return [dylib_module.from_fileobj(fh) for _ in range(n)]
 
     def readsym(self, fh, off, n):
         fh.seek(self.macho_header.offset + off)
@@ -101,4 +98,4 @@ class SymbolTable(object):
 
     def readrel(self, fh, off, n):
         fh.seek(self.macho_header.offset + off)
-        return [relocation_info.from_fileobj(fh) for i in range(n)]
+        return [relocation_info.from_fileobj(fh) for _ in range(n)]

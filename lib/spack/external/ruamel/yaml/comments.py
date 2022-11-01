@@ -48,10 +48,7 @@ class Comment(object):
         self._end = []  # end of document comments
 
     def __str__(self):
-        if self._end:
-            end = ',\n  end=' + str(self._end)
-        else:
-            end = ''
+        end = ',\n  end=' + str(self._end) if self._end else ''
         return "Comment(comment={0},\n  items={1}{2})".format(
             self.comment, self._items, end)
 
@@ -98,9 +95,7 @@ class Format(object):
         the object explicitly will be taken. If that is None as well the
         default flow style rules the format down the line, or the type
         of the constituent values (simple -> flow, map/list -> block)"""
-        if self._flow_style is None:
-            return default
-        return self._flow_style
+        return default if self._flow_style is None else self._flow_style
 
 
 class LineCol(object):
@@ -129,9 +124,7 @@ class LineCol(object):
         return data[x0], data[x1]
 
     def item(self, idx):
-        if self.data is None:
-            return None
-        return self.data[idx][0], self.data[idx][1]
+        return None if self.data is None else (self.data[idx][0], self.data[idx][1])
 
     def add_idx_line_col(self, key, data):
         if self.data is None:
@@ -198,7 +191,7 @@ class CommentedBase(object):
             comment = comment[:-1]  # strip final newline if there
         start_mark = Mark(None, None, None, indent, None, None)
         for com in comment.split('\n'):
-            pre_comments.append(CommentToken('# ' + com + '\n', start_mark, None))
+            pre_comments.append(CommentToken(f'# {com}' + '\n', start_mark, None))
 
     @property
     def fa(self):
@@ -220,11 +213,10 @@ class CommentedBase(object):
         if column is None:
             column = self._yaml_get_column(key)
         if comment[0] != '#':
-            comment = '# ' + comment
-        if column is None:
-            if comment[0] == '#':
-                comment = ' ' + comment
-                column = 0
+            comment = f'# {comment}'
+        if column is None and comment[0] == '#':
+            comment = f' {comment}'
+            column = 0
         start_mark = Mark(None, None, None, column, None, None)
         ct = [CommentToken(comment, start_mark, None), None]
         self._yaml_add_eol_comment(ct, key=key)
@@ -252,9 +244,7 @@ class CommentedBase(object):
         return getattr(self, Anchor.attrib)
 
     def yaml_anchor(self):
-        if not hasattr(self, Anchor.attrib):
-            return None
-        return self.anchor
+        return self.anchor if hasattr(self, Anchor.attrib) else None
 
     def yaml_set_anchor(self, value, always_dump=False):
         self.anchor.value = value
@@ -303,7 +293,6 @@ class CommentedSeq(list, CommentedBase):
         return res
 
     def _yaml_get_column(self, key):
-        column = None
         sel_idx = None
         pre, post = key-1, key+1
         if pre in self.ca.items:
@@ -318,9 +307,7 @@ class CommentedSeq(list, CommentedBase):
                 if row_idx not in self.ca.items:
                     continue
                 sel_idx = row_idx
-        if sel_idx is not None:
-            column = self._yaml_get_columnX(sel_idx)
-        return column
+        return self._yaml_get_columnX(sel_idx) if sel_idx is not None else None
 
     def _yaml_get_pre_comment(self):
         if self.ca.comment is None:
@@ -352,7 +339,6 @@ class CommentedMap(ordereddict, CommentedBase):
         return self.ca.items[key][2].start_mark.column
 
     def _yaml_get_column(self, key):
-        column = None
         sel_idx = None
         pre, post, last = None, None, None
         for x in self:
@@ -374,9 +360,7 @@ class CommentedMap(ordereddict, CommentedBase):
                 if k1 not in self.ca.items:
                     continue
                 sel_idx = k1
-        if sel_idx is not None:
-            column = self._yaml_get_columnX(sel_idx)
-        return column
+        return self._yaml_get_columnX(sel_idx) if sel_idx is not None else None
 
     def _yaml_get_pre_comment(self):
         if self.ca.comment is None:
@@ -476,8 +460,7 @@ class CommentedSet(MutableSet, CommentedMap):
         return x in self.odict
 
     def __iter__(self):
-        for x in self.odict:
-            yield x
+        yield from self.odict
 
     def __len__(self):
         return len(self.odict)

@@ -13,7 +13,7 @@ from jsonschema.validators import validator_for
 
 def _namedAnyWithDefault(name):
     if "." not in name:
-        name = "jsonschema." + name
+        name = f"jsonschema.{name}"
     return namedAny(name)
 
 

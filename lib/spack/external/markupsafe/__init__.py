@@ -102,7 +102,7 @@ class Markup(text_type):
         return self.__class__(text_type.__mod__(self, arg))
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, text_type.__repr__(self))
+        return f"{self.__class__.__name__}({text_type.__repr__(self)})"
 
     def join(self, seq):
         return self.__class__(text_type.join(self, map(self.escape, seq)))
@@ -165,9 +165,7 @@ class Markup(text_type):
         subclasses the correct type is returned.
         """
         rv = escape(s)
-        if rv.__class__ is not cls:
-            return cls(rv)
-        return rv
+        return cls(rv) if rv.__class__ is not cls else rv
 
     def make_simple_escaping_wrapper(name):  # noqa: B902
         orig = getattr(text_type, name)

@@ -42,10 +42,9 @@ class ForkedFunc:
         self.STDOUT = tempdir.ensure('stdout')
         self.STDERR = tempdir.ensure('stderr')
 
-        pid = os.fork()
-        if pid:  # in parent process
+        if pid := os.fork():
             self.pid = pid
-        else:  # in child process
+        else:
             self.pid = None
             self._child(nice_level, child_on_start, child_on_exit)
 

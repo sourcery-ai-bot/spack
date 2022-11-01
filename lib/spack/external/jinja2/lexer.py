@@ -287,10 +287,7 @@ class Token(tuple):
 
     def test_any(self, *iterable):
         """Test against multiple token expressions."""
-        for expr in iterable:
-            if self.test(expr):
-                return True
-        return False
+        return any(self.test(expr) for expr in iterable)
 
     def __repr__(self):
         return "Token(%r, %r, %r)" % (self.lineno, self.type, self.value)
@@ -490,7 +487,7 @@ class Lexer(object):
         root_tag_rules = compile_rules(environment)
 
         # block suffix if trimming is enabled
-        block_suffix_re = environment.trim_blocks and "\\n?" or ""
+        block_suffix_re = "\\n?" if environment.trim_blocks else ""
 
         # If lstrip is enabled, it should not be applied if there is any
         # non-whitespace between the newline and block.
@@ -676,7 +673,7 @@ class Lexer(object):
         stack = ["root"]
         if state is not None and state != "root":
             assert state in ("variable", "block"), "invalid state"
-            stack.append(state + "_begin")
+            stack.append(f"{state}_begin")
         statetokens = self.rules[stack[-1]]
         source_length = len(source)
         balancing_stack = []
@@ -732,11 +729,10 @@ class Lexer(object):
                         ):
                             # The start of text between the last newline and the tag.
                             l_pos = text.rfind("\n") + 1
-                            if l_pos > 0 or line_starting:
-                                # If there's only whitespace between the newline and the
-                                # tag, strip it.
-                                if not lstrip_unless_re.search(text, l_pos):
-                                    groups = (text[:l_pos],) + groups[1:]
+                            if (
+                                l_pos > 0 or line_starting
+                            ) and not lstrip_unless_re.search(text, l_pos):
+                                groups = (text[:l_pos],) + groups[1:]
 
                     for idx, token in enumerate(tokens):
                         # failure group
@@ -765,7 +761,6 @@ class Lexer(object):
                             lineno += data.count("\n") + newlines_stripped
                             newlines_stripped = 0
 
-                # strings as token just are yielded as it.
                 else:
                     data = m.group()
                     # update brace/parentheses balance
@@ -833,8 +828,6 @@ class Lexer(object):
                 # publish new function and start again
                 pos = pos2
                 break
-            # if loop terminated without break we haven't found a single match
-            # either we are at the end of the file or we have a problem
             else:
                 # end of text
                 if pos >= source_length:

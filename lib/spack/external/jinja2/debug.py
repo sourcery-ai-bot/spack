@@ -145,7 +145,7 @@ def fake_traceback(exc_value, tb, filename, lineno):
 
             try:
                 # Copy original value if it exists.
-                code_args.append(getattr(code, "co_" + attr))
+                code_args.append(getattr(code, f"co_{attr}"))
             except AttributeError:
                 # Some arguments were added later.
                 continue
@@ -168,14 +168,7 @@ def get_template_locals(real_locals):
     """Based on the runtime locals, get the context that would be
     available at that point in the template.
     """
-    # Start with the current template context.
-    ctx = real_locals.get("context")
-
-    if ctx:
-        data = ctx.get_all().copy()
-    else:
-        data = {}
-
+    data = ctx.get_all().copy() if (ctx := real_locals.get("context")) else {}
     # Might be in a derived context that only sets local variables
     # rather than pushing a context. Local variables follow the scheme
     # l_depth_name. Find the highest-depth local that has a value for

@@ -15,7 +15,7 @@ class ParseError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return "%s:%s: %s" %(self.path, self.lineno+1, self.msg)
+        return f"{self.path}:{self.lineno + 1}: {self.msg}"
 
 class SectionWrapper(object):
     def __init__(self, config, name):
@@ -35,8 +35,8 @@ class SectionWrapper(object):
         section = self.config.sections.get(self.name, [])
         def lineof(key):
             return self.config.lineof(self.name, key)
-        for name in sorted(section, key=lineof):
-            yield name
+
+        yield from sorted(section, key=lineof)
 
     def items(self):
         for name in self:
@@ -82,14 +82,12 @@ class IniConfig(object):
             # new value
             if name is not None and data is not None:
                 result.append((lineno, section, name, data))
-            # new section
-            elif name is not None and data is None:
+            elif name is not None:
                 if not name:
                     self._raise(lineno, 'empty section name')
                 section = name
                 result.append((lineno, section, None, None))
-            # continuation
-            elif name is None and data is not None:
+            elif data is not None:
                 if not result:
                     self._raise(lineno, 'unexpected value continuation')
                 last = result.pop()
@@ -104,10 +102,7 @@ class IniConfig(object):
 
     def _parseline(self, line, lineno):
         # blank lines
-        if iscommentline(line):
-            line = ""
-        else:
-            line = line.rstrip()
+        line = "" if iscommentline(line) else line.rstrip()
         if not line:
             return None, None
         # section
@@ -115,10 +110,7 @@ class IniConfig(object):
             realline = line
             for c in COMMENTCHARS:
                 line = line.split(c)[0].rstrip()
-            if line[-1] == "]":
-                return line[1:-1], None
-            return None, realline.strip()
-        # value
+            return (line[1:-1], None) if line[-1] == "]" else (None, realline.strip())
         elif not line[0].isspace():
             try:
                 name, value = line.split('=', 1)
@@ -130,7 +122,6 @@ class IniConfig(object):
                 except ValueError:
                     self._raise(lineno, 'unexpected line: %r' % line)
             return name.strip(), value.strip()
-        # continuation
         else:
             return None, line.strip()
 

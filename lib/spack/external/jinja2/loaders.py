@@ -88,8 +88,9 @@ class BaseLoader(object):
         """
         if not self.has_source_access:
             raise RuntimeError(
-                "%s cannot provide access to the source" % self.__class__.__name__
+                f"{self.__class__.__name__} cannot provide access to the source"
             )
+
         raise TemplateNotFound(template)
 
     def list_templates(self):
@@ -276,7 +277,7 @@ class PackageLoader(BaseLoader):
 
         def _walk(path):
             for filename in self.provider.resource_listdir(path):
-                fullname = path + "/" + filename
+                fullname = f"{path}/{filename}"
 
                 if self.provider.resource_isdir(fullname):
                     _walk(fullname)
@@ -389,8 +390,11 @@ class PrefixLoader(BaseLoader):
     def list_templates(self):
         result = []
         for prefix, loader in iteritems(self.mapping):
-            for template in loader.list_templates():
-                result.append(prefix + self.delimiter + template)
+            result.extend(
+                prefix + self.delimiter + template
+                for template in loader.list_templates()
+            )
+
         return result
 
 
@@ -482,12 +486,12 @@ class ModuleLoader(BaseLoader):
 
     @staticmethod
     def get_module_filename(name):
-        return ModuleLoader.get_template_key(name) + ".py"
+        return f"{ModuleLoader.get_template_key(name)}.py"
 
     @internalcode
     def load(self, environment, name, globals=None):
         key = self.get_template_key(name)
-        module = "%s.%s" % (self.package_name, key)
+        module = f"{self.package_name}.{key}"
         mod = getattr(self.module, module, None)
         if mod is None:
             try:

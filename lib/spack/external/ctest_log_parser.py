@@ -301,8 +301,7 @@ def _profile_match(matches, exceptions, line, match_times, exc_times):
         with _time(exc_times, i):
             if m.search(line):
                 return False
-    else:
-        return True
+    return True
 
 
 def _parse(lines, offset, profile):
@@ -390,7 +389,7 @@ class CTestLogParser(object):
             with open(stream) as f:
                 return self.parse(f, context, jobs)
 
-        lines = [line for line in stream]
+        lines = list(stream)
 
         if jobs is None:
             jobs = multiprocessing.cpu_count()
@@ -411,10 +410,7 @@ class CTestLogParser(object):
             pool = multiprocessing.Pool(jobs)
             try:
                 # this is a workaround for a Python bug in Pool with ctrl-C
-                if sys.version_info >= (3, 2):
-                    max_timeout = threading.TIMEOUT_MAX
-                else:
-                    max_timeout = 9999999
+                max_timeout = threading.TIMEOUT_MAX if sys.version_info >= (3, 2) else 9999999
                 results = pool.map_async(_parse_unpack, args, 1).get(max_timeout)
 
                 errors, warnings, timings = zip(*results)

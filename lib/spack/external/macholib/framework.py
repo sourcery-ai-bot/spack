@@ -40,6 +40,4 @@ def framework_info(filename):
     if not present
     """
     is_framework = _STRICT_FRAMEWORK_RE.match(filename)
-    if not is_framework:
-        return None
-    return is_framework.groupdict()
+    return is_framework.groupdict() if is_framework else None

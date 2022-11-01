@@ -52,8 +52,7 @@ def pytest_configure(config):
 class LsofFdLeakChecker(object):
     def get_open_files(self):
         out = self._exec_lsof()
-        open_files = self._parse_lsof_output(out)
-        return open_files
+        return self._parse_lsof_output(out)
 
     def _exec_lsof(self):
         pid = os.getpid()
@@ -95,19 +94,25 @@ class LsofFdLeakChecker(object):
             gc.collect()
         lines2 = self.get_open_files()
 
-        new_fds = set([t[0] for t in lines2]) - set([t[0] for t in lines1])
-        leaked_files = [t for t in lines2 if t[0] in new_fds]
-        if leaked_files:
-            error = []
-            error.append("***** %s FD leakage detected" % len(leaked_files))
-            error.extend([str(f) for f in leaked_files])
-            error.append("*** Before:")
-            error.extend([str(f) for f in lines1])
-            error.append("*** After:")
-            error.extend([str(f) for f in lines2])
-            error.append(error[0])
-            error.append("*** function %s:%s: %s " % item.location)
-            error.append("See issue #2366")
+        new_fds = {t[0] for t in lines2} - {t[0] for t in lines1}
+        if leaked_files := [t for t in lines2 if t[0] in new_fds]:
+            error = [
+                f"***** {len(leaked_files)} FD leakage detected",
+                *[str(f) for f in leaked_files],
+                "*** Before:",
+                *[str(f) for f in lines1],
+                "*** After:",
+                *[str(f) for f in lines2],
+            ]
+
+            error.extend(
+                (
+                    error[0],
+                    "*** function %s:%s: %s " % item.location,
+                    "See issue #2366",
+                )
+            )
+
             item.warn('', "\n".join(error))
 
 
@@ -157,7 +162,7 @@ def anypython(request):
                 executable = py.path.local(executable)
                 if executable.check():
                     return executable
-        pytest.skip("no suitable %s found" % (name,))
+        pytest.skip(f"no suitable {name} found")
     return executable
 
 # used at least by pytest-xdist plugin
@@ -253,8 +258,11 @@ class HookRecorder:
             if call._name == name:
                 del self.calls[i]
                 return call
-        lines = ["could not find call %r, in:" % (name,)]
-        lines.extend(["  %s" % str(x) for x in self.calls])
+        lines = [
+            "could not find call %r, in:" % (name,),
+            *[f"  {str(x)}" for x in self.calls],
+        ]
+
         pytest.fail("\n".join(lines))
 
     def getcall(self, name):
@@ -373,12 +381,8 @@ class RunResult:
         the terminal output that the test process produced."""
         for line in reversed(self.outlines):
             if 'seconds' in line:
-                outcomes = rex_outcome.findall(line)
-                if outcomes:
-                    d = {}
-                    for num, cat in outcomes:
-                        d[cat] = int(num)
-                    return d
+                if outcomes := rex_outcome.findall(line):
+                    return {cat: int(num) for num, cat in outcomes}
         raise ValueError("Pytest terminal report not found")
 
     def assert_outcomes(self, passed=0, skipped=0, failed=0, error=0):
@@ -755,18 +759,17 @@ class Testdir:
         capture = MultiCapture(Capture=SysCapture)
         capture.start_capturing()
         try:
-            try:
-                reprec = self.inline_run(*args, **kwargs)
-            except SystemExit as e:
+            reprec = self.inline_run(*args, **kwargs)
+        except SystemExit as e:
 
-                class reprec:
-                    ret = e.args[0]
+            class reprec:
+                ret = e.args[0]
 
-            except Exception:
-                traceback.print_exc()
+        except Exception:
+            traceback.print_exc()
 
-                class reprec:
-                    ret = 3
+            class reprec:
+                ret = 3
         finally:
             out, err = capture.readouterr()
             capture.stop_capturing()
@@ -794,8 +797,8 @@ class Testdir:
                 # print("basedtemp exists: %s" %(args,))
                 break
         else:
-            args.append("--basetemp=%s" % self.tmpdir.dirpath('basetemp'))
-            # print("added basetemp: %s" %(args,))
+            args.append(f"--basetemp={self.tmpdir.dirpath('basetemp')}")
+                # print("added basetemp: %s" %(args,))
         return args
 
     def parseconfig(self, *args):
@@ -885,9 +888,7 @@ class Testdir:
         if withinit:
             self.makepyfile(__init__="#")
         self.config = config = self.parseconfigure(path, *configargs)
-        node = self.getnode(config, path)
-
-        return node
+        return self.getnode(config, path)
 
     def collect_by_name(self, modcol, name):
         """Return the collection node for name from the module collection.
@@ -942,7 +943,7 @@ class Testdir:
         p1 = self.tmpdir.join("stdout")
         p2 = self.tmpdir.join("stderr")
         print("running:", ' '.join(cmdargs))
-        print("     in:", str(py.path.local()))
+        print("     in:", py.path.local())
         f1 = codecs.open(str(p1), "w", encoding="utf8")
         f2 = codecs.open(str(p2), "w", encoding="utf8")
         try:
@@ -1003,15 +1004,8 @@ class Testdir:
         """
         p = py.path.local.make_numbered_dir(prefix="runpytest-",
                                             keep=None, rootdir=self.tmpdir)
-        args = ('--basetemp=%s' % p, ) + args
-        # for x in args:
-        #    if '--confcutdir' in str(x):
-        #        break
-        # else:
-        #    pass
-        #    args = ('--confcutdir=.',) + args
-        plugins = [x for x in self.plugins if isinstance(x, str)]
-        if plugins:
+        args = (f'--basetemp={p}', ) + args
+        if plugins := [x for x in self.plugins if isinstance(x, str)]:
             args = ('-p', plugins[0]) + args
         args = self._getpytestargs() + args
         return self.run(*args)
@@ -1027,7 +1021,7 @@ class Testdir:
         """
         basetemp = self.tmpdir.mkdir("temp-pexpect")
         invoke = " ".join(map(str, self._getpytestargs()))
-        cmd = "%s --basetemp=%s %s" % (invoke, basetemp, string)
+        cmd = f"{invoke} --basetemp={basetemp} {string}"
         return self.spawn(cmd, expect_timeout=expect_timeout)
 
     def spawn(self, cmd, expect_timeout=10.0):

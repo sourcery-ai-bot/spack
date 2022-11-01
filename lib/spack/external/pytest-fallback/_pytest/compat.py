@@ -98,7 +98,7 @@ def getfuncargnames(function, startindex=None, cls=None):
     while hasattr(realfunction, "__wrapped__"):
         realfunction = realfunction.__wrapped__
     if startindex is None:
-        startindex = inspect.ismethod(function) and 1 or 0
+        startindex = 1 if inspect.ismethod(function) else 0
     if realfunction != function:
         startindex += num_mock_patch_args(function)
         function = realfunction
@@ -113,8 +113,7 @@ def getfuncargnames(function, startindex=None, cls=None):
         argnames = inspect.getargs(_pytest._code.getrawcode(function))[0]
     defaults = getattr(function, 'func_defaults',
                        getattr(function, '__defaults__', None)) or ()
-    numdefaults = len(defaults)
-    if numdefaults:
+    if numdefaults := len(defaults):
         return tuple(argnames[startindex:-numdefaults])
     return tuple(argnames[startindex:])
 
@@ -154,16 +153,15 @@ if _PY3:
            a utf-8 string.
 
         """
-        if isinstance(val, bytes):
-            if val:
-                # source: http://goo.gl/bGsnwC
-                encoded_bytes, _ = codecs.escape_encode(val)
-                return encoded_bytes.decode('ascii')
-            else:
-                # empty bytes crashes codecs.escape_encode (#1087)
-                return ''
-        else:
+        if not isinstance(val, bytes):
             return val.encode('unicode_escape').decode('ascii')
+        if val:
+            # source: http://goo.gl/bGsnwC
+            encoded_bytes, _ = codecs.escape_encode(val)
+            return encoded_bytes.decode('ascii')
+        else:
+            # empty bytes crashes codecs.escape_encode (#1087)
+            return ''
 else:
     STRING_TYPES = bytes, str, unicode
     UNICODE_TYPES = unicode,
@@ -179,13 +177,12 @@ else:
         unicode escapes.
 
         """
-        if isinstance(val, bytes):
-            try:
-                return val.encode('ascii')
-            except UnicodeDecodeError:
-                return val.encode('string-escape')
-        else:
+        if not isinstance(val, bytes):
             return val.encode('unicode-escape')
+        try:
+            return val.encode('ascii')
+        except UnicodeDecodeError:
+            return val.encode('string-escape')
 
 
 def get_real_func(obj):

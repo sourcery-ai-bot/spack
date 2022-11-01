@@ -45,9 +45,11 @@ def wrap_generate_func(original_generate):
             pass
 
     def generate(self, *args, **kwargs):
-        if not self.environment.is_async:
-            return original_generate(self, *args, **kwargs)
-        return _convert_generator(self, asyncio.get_event_loop(), args, kwargs)
+        return (
+            _convert_generator(self, asyncio.get_event_loop(), args, kwargs)
+            if self.environment.is_async
+            else original_generate(self, *args, **kwargs)
+        )
 
     return update_wrapper(generate, original_generate)
 
@@ -85,9 +87,11 @@ def wrap_block_reference_call(original_call):
 
     @internalcode
     def __call__(self):
-        if not self._context.environment.is_async:
-            return original_call(self)
-        return async_call(self)
+        return (
+            async_call(self)
+            if self._context.environment.is_async
+            else original_call(self)
+        )
 
     return update_wrapper(__call__, original_call)
 
@@ -102,9 +106,11 @@ def wrap_macro_invoke(original_invoke):
 
     @internalcode
     def _invoke(self, arguments, autoescape):
-        if not self._environment.is_async:
-            return original_invoke(self, arguments, autoescape)
-        return async_invoke(self, arguments, autoescape)
+        return (
+            async_invoke(self, arguments, autoescape)
+            if self._environment.is_async
+            else original_invoke(self, arguments, autoescape)
+        )
 
     return update_wrapper(_invoke, original_invoke)
 
@@ -170,9 +176,7 @@ def patch_all():
 
 
 async def auto_await(value):
-    if inspect.isawaitable(value):
-        return await value
-    return value
+    return await value if inspect.isawaitable(value) else value
 
 
 async def auto_aiter(iterable):
@@ -228,10 +232,7 @@ class AsyncLoopContext(LoopContext):
     async def nextitem(self):
         rv = await self._peek_next()
 
-        if rv is missing:
-            return self._undefined("there is no next item")
-
-        return rv
+        return self._undefined("there is no next item") if rv is missing else rv
 
     def __aiter__(self):
         return self

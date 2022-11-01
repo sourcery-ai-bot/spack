@@ -11,8 +11,7 @@ async def auto_to_seq(value):
         async for item in value:
             seq.append(item)
     else:
-        for item in value:
-            seq.append(item)
+        seq.extend(iter(value))
     return seq
 
 
@@ -26,15 +25,15 @@ async def async_select_or_reject(args, kwargs, modfunc, lookup_attr):
 
 def dualfilter(normal_filter, async_filter):
     wrap_evalctx = False
-    if getattr(normal_filter, "environmentfilter", False) is True:
+    if getattr(normal_filter, "environmentfilter", False):
 
         def is_async(args):
             return args[0].is_async
 
         wrap_evalctx = False
     else:
-        has_evalctxfilter = getattr(normal_filter, "evalcontextfilter", False) is True
-        has_ctxfilter = getattr(normal_filter, "contextfilter", False) is True
+        has_evalctxfilter = getattr(normal_filter, "evalcontextfilter", False)
+        has_ctxfilter = getattr(normal_filter, "contextfilter", False)
         wrap_evalctx = not has_evalctxfilter and not has_ctxfilter
 
         def is_async(args):
@@ -45,9 +44,7 @@ def dualfilter(normal_filter, async_filter):
         b = is_async(args)
         if wrap_evalctx:
             args = args[1:]
-        if b:
-            return async_filter(*args, **kwargs)
-        return normal_filter(*args, **kwargs)
+        return async_filter(*args, **kwargs) if b else normal_filter(*args, **kwargs)
 
     if wrap_evalctx:
         wrapper.evalcontextfilter = True

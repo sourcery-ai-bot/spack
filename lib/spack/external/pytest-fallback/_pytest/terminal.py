@@ -56,7 +56,8 @@ def pytest_configure(config):
     if config.option.debug or config.option.traceconfig:
         def mywriter(tags, args):
             msg = " ".join(map(str, args))
-            reporter.write_line("[traceconfig] " + msg)
+            reporter.write_line(f"[traceconfig] {msg}")
+
         config.trace.root.setprocessor("pytest:config", mywriter)
 
 
@@ -82,9 +83,7 @@ def pytest_report_teststatus(report):
     elif report.skipped:
         letter = "s"
     elif report.failed:
-        letter = "F"
-        if report.when != "call":
-            letter = "f"
+        letter = "f" if report.when != "call" else "F"
     return report.outcome, letter, report.outcome.upper()
 
 
@@ -114,12 +113,11 @@ class WarningReport:
         if self.nodeid:
             return self.nodeid
         if self.fslocation:
-            if isinstance(self.fslocation, tuple) and len(self.fslocation) >= 2:
-                filename, linenum = self.fslocation[:2]
-                relpath = py.path.local(filename).relto(config.invocation_dir)
-                return '%s:%s' % (relpath, linenum)
-            else:
+            if not isinstance(self.fslocation, tuple) or len(self.fslocation) < 2:
                 return str(self.fslocation)
+            filename, linenum = self.fslocation[:2]
+            relpath = py.path.local(filename).relto(config.invocation_dir)
+            return f'{relpath}:{linenum}'
         return None
 
 
@@ -154,7 +152,7 @@ class TerminalReporter:
             self.currentfspath = fspath
             fspath = self.startdir.bestrelpath(fspath)
             self._tw.line()
-            self._tw.write(fspath + " ")
+            self._tw.write(f"{fspath} ")
         self._tw.write(res)
 
     def write_ensure_prefix(self, prefix, extra="", **kwargs):
@@ -189,8 +187,7 @@ class TerminalReporter:
 
         The rest of the keyword arguments are markup instructions.
         """
-        erase = markup.pop('erase', False)
-        if erase:
+        if erase := markup.pop('erase', False):
             fill_count = self._tw.fullwidth - len(line)
             fill = ' ' * fill_count
         else:
@@ -210,7 +207,7 @@ class TerminalReporter:
 
     def pytest_internalerror(self, excrepr):
         for line in py.builtin.text(excrepr).split("\n"):
-            self.write_line("INTERNALERROR> " + line)
+            self.write_line(f"INTERNALERROR> {line}")
         return 1
 
     def pytest_logwarning(self, code, fslocation, message, nodeid):
@@ -221,7 +218,7 @@ class TerminalReporter:
 
     def pytest_plugin_registered(self, plugin):
         if self.config.option.traceconfig:
-            msg = "PLUGIN registered: %s" % (plugin,)
+            msg = f"PLUGIN registered: {plugin}"
             # XXX this event may happen during setup/teardown time
             #     which unfortunately captures our output here
             #     which garbles our output if we use self.write_line
@@ -257,13 +254,12 @@ class TerminalReporter:
         else:
             if isinstance(word, tuple):
                 word, markup = word
-            else:
-                if rep.passed:
-                    markup = {'green': True}
-                elif rep.failed:
-                    markup = {'red': True}
-                elif rep.skipped:
-                    markup = {'yellow': True}
+            elif rep.passed:
+                markup = {'green': True}
+            elif rep.failed:
+                markup = {'red': True}
+            elif rep.skipped:
+                markup = {'yellow': True}
             line = self._locationline(rep.nodeid, *rep.location)
             if not hasattr(rep, 'node'):
                 self.write_ensure_prefix(line, word, **markup)
@@ -271,9 +267,9 @@ class TerminalReporter:
             else:
                 self.ensure_newline()
                 if hasattr(rep, 'node'):
-                    self._tw.write("[%s] " % rep.node.gateway.id)
+                    self._tw.write(f"[{rep.node.gateway.id}] ")
                 self._tw.write(word, **markup)
-                self._tw.write(" " + line)
+                self._tw.write(f" {line}")
                 self.currentfspath = -2
 
     def pytest_collection(self):
@@ -297,11 +293,11 @@ class TerminalReporter:
 
         errors = len(self.stats.get('error', []))
         skipped = len(self.stats.get('skipped', []))
-        if final:
-            line = "collected "
-        else:
-            line = "collecting "
-        line += str(self._numcollected) + " item" + ('' if self._numcollected == 1 else 's')
+        line = "collected " if final else "collecting "
+        line += f"{str(self._numcollected)} item" + (
+            '' if self._numcollected == 1 else 's'
+        )
+
         if errors:
             line += " / %d errors" % errors
         if skipped:
@@ -323,15 +319,15 @@ class TerminalReporter:
             return
         self.write_sep("=", "test session starts", bold=True)
         verinfo = platform.python_version()
-        msg = "platform %s -- Python %s" % (sys.platform, verinfo)
+        msg = f"platform {sys.platform} -- Python {verinfo}"
         if hasattr(sys, 'pypy_version_info'):
             verinfo = ".".join(map(str, sys.pypy_version_info[:3]))
-            msg += "[pypy-%s-%s]" % (verinfo, sys.pypy_version_info[3])
-        msg += ", pytest-%s, py-%s, pluggy-%s" % (
-               pytest.__version__, py.__version__, pluggy.__version__)
+            msg += f"[pypy-{verinfo}-{sys.pypy_version_info[3]}]"
+        msg += f", pytest-{pytest.__version__}, py-{py.__version__}, pluggy-{pluggy.__version__}"
+
         if self.verbosity > 0 or self.config.option.debug or \
-           getattr(self.config.option, 'pastebin', None):
-            msg += " -- " + str(sys.executable)
+               getattr(self.config.option, 'pastebin', None):
+            msg += f" -- {str(sys.executable)}"
         self.write_line(msg)
         lines = self.config.hook.pytest_report_header(
             config=self.config, startdir=self.startdir)
@@ -345,14 +341,11 @@ class TerminalReporter:
     def pytest_report_header(self, config):
         inifile = ""
         if config.inifile:
-            inifile = " " + config.rootdir.bestrelpath(config.inifile)
-        lines = ["rootdir: %s, inifile:%s" % (config.rootdir, inifile)]
+            inifile = f" {config.rootdir.bestrelpath(config.inifile)}"
+        lines = [f"rootdir: {config.rootdir}, inifile:{inifile}"]
 
-        plugininfo = config.pluginmanager.list_plugin_distinfo()
-        if plugininfo:
-
-            lines.append(
-                "plugins: %s" % ", ".join(_plugin_nameversions(plugininfo)))
+        if plugininfo := config.pluginmanager.list_plugin_distinfo():
+            lines.append(f'plugins: {", ".join(_plugin_nameversions(plugininfo))}')
         return lines
 
     def pytest_collection_finish(self, session):
@@ -390,16 +383,14 @@ class TerminalReporter:
         indent = ""
         for item in items:
             needed_collectors = item.listchain()[1:]  # strip root node
-            while stack:
-                if stack == needed_collectors[:len(stack)]:
-                    break
+            while stack and stack != needed_collectors[: len(stack)]:
                 stack.pop()
             for col in needed_collectors[len(stack):]:
                 stack.append(col)
                 # if col.name == "()":
                 #    continue
                 indent = (len(stack) - 1) * "  "
-                self._tw.line("%s%s" % (indent, col))
+                self._tw.line(f"{indent}{col}")
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_sessionfinish(self, exitstatus):
@@ -449,15 +440,16 @@ class TerminalReporter:
                 values[0] = values[0].replace('.', '::')  # don't replace '.' in params
                 line += "[".join(values)
             return line
+
         # collect_fspath comes from testid which has a "/"-normalized path
 
         if fspath:
             res = mkrel(nodeid).replace("::()", "")  # parens-normalization
             if nodeid.split("::")[0] != fspath.replace("\\", nodes.SEP):
-                res += " <- " + self.startdir.bestrelpath(fspath)
+                res += f" <- {self.startdir.bestrelpath(fspath)}"
         else:
             res = "[location]"
-        return res + " "
+        return f"{res} "
 
     def _getfailureheadline(self, rep):
         if hasattr(rep, 'location'):
@@ -479,41 +471,39 @@ class TerminalReporter:
     # summaries for sessionfinish
     #
     def getreports(self, name):
-        values = []
-        for x in self.stats.get(name, []):
-            if not hasattr(x, '_pdbshown'):
-                values.append(x)
-        return values
+        return [x for x in self.stats.get(name, []) if not hasattr(x, '_pdbshown')]
 
     def summary_warnings(self):
-        if self.hasopt("w"):
-            all_warnings = self.stats.get("warnings")
-            if not all_warnings:
-                return
+        if not self.hasopt("w"):
+            return
+        all_warnings = self.stats.get("warnings")
+        if not all_warnings:
+            return
 
-            grouped = itertools.groupby(all_warnings, key=lambda wr: wr.get_location(self.config))
+        grouped = itertools.groupby(all_warnings, key=lambda wr: wr.get_location(self.config))
 
-            self.write_sep("=", "warnings summary", yellow=True, bold=False)
-            for location, warnings in grouped:
-                self._tw.line(str(location) or '<undetermined location>')
-                for w in warnings:
-                    lines = w.message.splitlines()
-                    indented = '\n'.join('  ' + x for x in lines)
-                    self._tw.line(indented)
-                self._tw.line()
-            self._tw.line('-- Docs: http://doc.pytest.org/en/latest/warnings.html')
+        self.write_sep("=", "warnings summary", yellow=True, bold=False)
+        for location, warnings in grouped:
+            self._tw.line(str(location) or '<undetermined location>')
+            for w in warnings:
+                lines = w.message.splitlines()
+                indented = '\n'.join(f'  {x}' for x in lines)
+                self._tw.line(indented)
+            self._tw.line()
+        self._tw.line('-- Docs: http://doc.pytest.org/en/latest/warnings.html')
 
     def summary_passes(self):
-        if self.config.option.tbstyle != "no":
-            if self.hasopt("P"):
-                reports = self.getreports('passed')
-                if not reports:
-                    return
-                self.write_sep("=", "PASSES")
-                for rep in reports:
-                    msg = self._getfailureheadline(rep)
-                    self.write_sep("_", msg)
-                    self._outrep_summary(rep)
+        if self.config.option.tbstyle == "no":
+            return
+        if self.hasopt("P"):
+            reports = self.getreports('passed')
+            if not reports:
+                return
+            self.write_sep("=", "PASSES")
+            for rep in reports:
+                msg = self._getfailureheadline(rep)
+                self.write_sep("_", msg)
+                self._outrep_summary(rep)
 
     def print_teardown_sections(self, rep):
         for secname, content in rep.sections:
@@ -524,41 +514,43 @@ class TerminalReporter:
                 self._tw.line(content)
 
     def summary_failures(self):
-        if self.config.option.tbstyle != "no":
-            reports = self.getreports('failed')
-            if not reports:
-                return
-            self.write_sep("=", "FAILURES")
-            for rep in reports:
-                if self.config.option.tbstyle == "line":
-                    line = self._getcrashline(rep)
-                    self.write_line(line)
-                else:
-                    msg = self._getfailureheadline(rep)
-                    markup = {'red': True, 'bold': True}
-                    self.write_sep("_", msg, **markup)
-                    self._outrep_summary(rep)
-                    for report in self.getreports(''):
-                        if report.nodeid == rep.nodeid and report.when == 'teardown':
-                            self.print_teardown_sections(report)
+        if self.config.option.tbstyle == "no":
+            return
+        reports = self.getreports('failed')
+        if not reports:
+            return
+        self.write_sep("=", "FAILURES")
+        for rep in reports:
+            if self.config.option.tbstyle == "line":
+                line = self._getcrashline(rep)
+                self.write_line(line)
+            else:
+                msg = self._getfailureheadline(rep)
+                markup = {'red': True, 'bold': True}
+                self.write_sep("_", msg, **markup)
+                self._outrep_summary(rep)
+                for report in self.getreports(''):
+                    if report.nodeid == rep.nodeid and report.when == 'teardown':
+                        self.print_teardown_sections(report)
 
     def summary_errors(self):
-        if self.config.option.tbstyle != "no":
-            reports = self.getreports('error')
-            if not reports:
-                return
-            self.write_sep("=", "ERRORS")
-            for rep in self.stats['error']:
-                msg = self._getfailureheadline(rep)
-                if not hasattr(rep, 'when'):
+        if self.config.option.tbstyle == "no":
+            return
+        reports = self.getreports('error')
+        if not reports:
+            return
+        self.write_sep("=", "ERRORS")
+        for rep in self.stats['error']:
+            msg = self._getfailureheadline(rep)
+            if not hasattr(rep, 'when'):
                     # collect
-                    msg = "ERROR collecting " + msg
-                elif rep.when == "setup":
-                    msg = "ERROR at setup of " + msg
-                elif rep.when == "teardown":
-                    msg = "ERROR at teardown of " + msg
-                self.write_sep("_", msg)
-                self._outrep_summary(rep)
+                msg = f"ERROR collecting {msg}"
+            elif rep.when == "setup":
+                msg = f"ERROR at setup of {msg}"
+            elif rep.when == "teardown":
+                msg = f"ERROR at teardown of {msg}"
+            self.write_sep("_", msg)
+            self._outrep_summary(rep)
 
     def _outrep_summary(self, rep):
         rep.toterminal(self._tw)
@@ -597,8 +589,7 @@ def repr_pythonversion(v=None):
 def flatten(values):
     for x in values:
         if isinstance(x, (list, tuple)):
-            for y in flatten(x):
-                yield y
+            yield from flatten(x)
         else:
             yield x
 
@@ -608,30 +599,21 @@ def build_summary_stats_line(stats):
             "xfailed xpassed warnings error").split()
     unknown_key_seen = False
     for key in stats.keys():
-        if key not in keys:
-            if key:  # setup/teardown reports have an empty key, ignore them
-                keys.append(key)
-                unknown_key_seen = True
+        if key not in keys and key:
+            keys.append(key)
+            unknown_key_seen = True
     parts = []
     for key in keys:
-        val = stats.get(key, None)
-        if val:
+        if val := stats.get(key, None):
             parts.append("%d %s" % (len(val), key))
 
-    if parts:
-        line = ", ".join(parts)
-    else:
-        line = "no tests ran"
-
+    line = ", ".join(parts) if parts else "no tests ran"
     if 'failed' in stats or 'error' in stats:
         color = 'red'
-    elif 'warnings' in stats or unknown_key_seen:
+    elif 'warnings' in stats or unknown_key_seen or 'passed' not in stats:
         color = 'yellow'
-    elif 'passed' in stats:
-        color = 'green'
     else:
-        color = 'yellow'
-
+        color = 'green'
     return (line, color)
 
 
@@ -641,8 +623,7 @@ def _plugin_nameversions(plugininfo):
         # gets us name and version!
         name = '{dist.project_name}-{dist.version}'.format(dist=dist)
         # questionable convenience, but it keeps things short
-        if name.startswith("pytest-"):
-            name = name[7:]
+        name = name.removeprefix("pytest-")
         # we decided to print python package names
         # they can have more than one plugin
         if name not in values:

@@ -56,7 +56,7 @@ class Graph(object):
                     head, tail, data = item
                     self.add_edge(head, tail, data)
                 else:
-                    raise GraphError("Cannot create edge from %s" % (item,))
+                    raise GraphError(f"Cannot create edge from {item}")
 
     def __repr__(self):
         return "<Graph: %d nodes, %d edges>" % (
@@ -114,7 +114,7 @@ class Graph(object):
             self.nodes[tail_id][0].append(edge)
             self.nodes[head_id][1].append(edge)
         except KeyError:
-            raise GraphError("Invalid nodes %s -> %s" % (head_id, tail_id))
+            raise GraphError(f"Invalid nodes {head_id} -> {tail_id}")
 
         # store edge information
         self.edges[edge] = (head_id, tail_id, edge_data)
@@ -132,7 +132,7 @@ class Graph(object):
             self.nodes[head_id][1].remove(edge)
             del self.edges[edge]
         except KeyError:
-            raise GraphError("Invalid edge %s" % edge)
+            raise GraphError(f"Invalid edge {edge}")
 
     def hide_node(self, node):
         """
@@ -146,7 +146,7 @@ class Graph(object):
                 self.hide_edge(edge)
             del self.nodes[node]
         except KeyError:
-            raise GraphError("Invalid node %s" % node)
+            raise GraphError(f"Invalid node {node}")
 
     def restore_node(self, node):
         """
@@ -159,7 +159,7 @@ class Graph(object):
                 self.restore_edge(edge)
             del self.hidden_nodes[node]
         except KeyError:
-            raise GraphError("Invalid node %s" % node)
+            raise GraphError(f"Invalid node {node}")
 
     def restore_edge(self, edge):
         """
@@ -172,7 +172,7 @@ class Graph(object):
             self.edges[edge] = head_id, tail_id, data
             del self.hidden_edges[edge]
         except KeyError:
-            raise GraphError("Invalid edge %s" % edge)
+            raise GraphError(f"Invalid edge {edge}")
 
     def restore_all_edges(self):
         """
@@ -205,7 +205,7 @@ class Graph(object):
             head, tail, data = self.edges[edge]
         except KeyError:
             head, tail = None, None
-            raise GraphError("Invalid edge %s" % edge)
+            raise GraphError(f"Invalid edge {edge}")
 
         return (head, tail)
 
@@ -213,10 +213,10 @@ class Graph(object):
         """
         Returns the edge that connects the head_id and tail_id nodes
         """
-        for edge in self.out_edges(head):
-            if self.tail(edge) == tail:
-                return edge
-        return None
+        return next(
+            (edge for edge in self.out_edges(head) if self.tail(edge) == tail),
+            None,
+        )
 
     def number_of_nodes(self):
         """
@@ -302,7 +302,7 @@ class Graph(object):
         """
         Replace the edge data for a specific edge
         """
-        self.edges[edge] = self.edges[edge][0:2] + (edge_data,)
+        self.edges[edge] = self.edges[edge][:2] + (edge_data,)
 
     def head(self, edge):
         """
@@ -341,7 +341,7 @@ class Graph(object):
         try:
             return list(self.nodes[node][1])
         except KeyError:
-            raise GraphError("Invalid node %s" % node)
+            raise GraphError(f"Invalid node {node}")
 
     def inc_edges(self, node):
         """
@@ -350,7 +350,7 @@ class Graph(object):
         try:
             return list(self.nodes[node][0])
         except KeyError:
-            raise GraphError("Invalid node %s" % node)
+            raise GraphError(f"Invalid node {node}")
 
     def all_edges(self, node):
         """
@@ -399,8 +399,7 @@ class Graph(object):
             get_next = self.head
 
         for node in self.node_list():
-            degree = get_degree(node)
-            if degree:
+            if degree := get_degree(node):
                 indeg[node] = degree
             else:
                 queue.append(node)
@@ -415,12 +414,7 @@ class Graph(object):
                     if indeg[tail_id] == 0:
                         queue.append(tail_id)
 
-        if len(topo_list) == len(self.node_list()):
-            valid = True
-        else:
-            # the graph has cycles, invalid topological sort
-            valid = False
-
+        valid = len(topo_list) == len(self.node_list())
         return (valid, topo_list)
 
     def forw_topo_sort(self):
@@ -642,12 +636,11 @@ class Graph(object):
                 sec_set.remove(nbr)  # loop defense
             num += len(nbr_set & sec_set)
 
-        nbr_num = len(nbr_set)
-        if nbr_num:
-            clust_coef = float(num) / (nbr_num * (nbr_num - 1))
-        else:
-            clust_coef = 0.0
-        return clust_coef
+        return (
+            float(num) / (nbr_num * (nbr_num - 1))
+            if (nbr_num := len(nbr_set))
+            else 0.0
+        )
 
     def get_hops(self, start, end=None, forward=True):
         """

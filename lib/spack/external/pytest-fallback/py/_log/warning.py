@@ -29,7 +29,7 @@ def _apiwarn(startversion, msg, stacklevel=2, function=None):
             frame = frame.f_back
         else:
             stacklevel = 1
-    msg = "%s (since version %s)" %(msg, startversion)
+    msg = f"{msg} (since version {startversion})"
     warn(msg, stacklevel=stacklevel+1, function=function)
 
 def warn(msg, stacklevel=1, function=None):
@@ -45,10 +45,7 @@ def warn(msg, stacklevel=1, function=None):
         else:
             globals = caller.f_globals
             lineno = caller.f_lineno
-        if '__name__' in globals:
-            module = globals['__name__']
-        else:
-            module = "<string>"
+        module = globals['__name__'] if '__name__' in globals else "<string>"
         filename = globals.get('__file__')
     if filename:
         fnl = filename.lower()

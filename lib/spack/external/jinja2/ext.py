@@ -41,9 +41,9 @@ _ws_re = re.compile(r"\s*\n\s*")
 class ExtensionRegistry(type):
     """Gives the extension an unique identifier."""
 
-    def __new__(mcs, name, bases, d):
-        rv = type.__new__(mcs, name, bases, d)
-        rv.identifier = rv.__module__ + "." + rv.__name__
+    def __new__(cls, name, bases, d):
+        rv = type.__new__(cls, name, bases, d)
+        rv.identifier = f"{rv.__module__}.{rv.__name__}"
         return rv
 
 
@@ -559,8 +559,7 @@ def extract_from_ast(node, gettext_functions=GETTEXT_FUNCTIONS, babel_style=True
             else:
                 strings.append(None)
 
-        for _ in node.kwargs:
-            strings.append(None)
+        strings.extend(None for _ in node.kwargs)
         if node.dyn_args is not None:
             strings.append(None)
         if node.dyn_kwargs is not None:
@@ -571,10 +570,7 @@ def extract_from_ast(node, gettext_functions=GETTEXT_FUNCTIONS, babel_style=True
             if not strings:
                 continue
         else:
-            if len(strings) == 1:
-                strings = strings[0]
-            else:
-                strings = tuple(strings)
+            strings = strings[0] if len(strings) == 1 else tuple(strings)
         yield node.lineno, node.node.name, strings
 
 

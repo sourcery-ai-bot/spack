@@ -12,7 +12,7 @@ class Std(object):
         try:
             m = __import__(name)
         except ImportError:
-            raise AttributeError("py.std: could not import %s" % name)
+            raise AttributeError(f"py.std: could not import {name}")
         return m
 
 std = Std()

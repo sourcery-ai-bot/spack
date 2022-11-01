@@ -27,9 +27,11 @@ def format_exception_only(etype, value):
     #
     # Clear these out first because issubtype(string1, SyntaxError)
     # would throw another exception and mask the original problem.
-    if (isinstance(etype, BaseException) or
-        isinstance(etype, types.InstanceType) or
-        etype is None or type(etype) is str):
+    if (
+        isinstance(etype, (BaseException, types.InstanceType))
+        or etype is None
+        or type(etype) is str
+    ):
         return [_format_final_exc_line(etype, value)]
 
     stype = etype.__name__
@@ -62,11 +64,11 @@ def format_exception_only(etype, value):
 def _format_final_exc_line(etype, value):
     """Return a list of a single line -- normal case for format_exception_only"""
     valuestr = _some_str(value)
-    if value is None or not valuestr:
-        line = "%s\n" % etype
-    else:
-        line = "%s: %s\n" % (etype, valuestr)
-    return line
+    return (
+        "%s\n" % etype
+        if value is None or not valuestr
+        else "%s: %s\n" % (etype, valuestr)
+    )
 
 def _some_str(value):
     try:
@@ -76,4 +78,4 @@ def _some_str(value):
             return str(value)
         except Exception:
             pass
-    return '<unprintable %s object>' % type(value).__name__
+    return f'<unprintable {type(value).__name__} object>'

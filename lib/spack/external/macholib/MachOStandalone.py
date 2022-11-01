@@ -53,10 +53,9 @@ class MachOStandalone(object):
     def getClass(self, name, cls):
         if in_system_path(name):
             return ExcludedMachO
-        for base in self.excludes:
-            if name.startswith(base):
-                return ExcludedMachO
-        return cls
+        return next(
+            (ExcludedMachO for base in self.excludes if name.startswith(base)), cls
+        )
 
     def locate(self, filename, loader=None):
         if in_system_path(filename):
@@ -69,14 +68,9 @@ class MachOStandalone(object):
         if filename in self.changemap:
             return self.changemap[filename]
         info = framework_info(filename)
-        if info is None:
-            res = self.copy_dylib(filename)
-            self.changemap[filename] = res
-            return res
-        else:
-            res = self.copy_framework(info)
-            self.changemap[filename] = res
-            return res
+        res = self.copy_dylib(filename) if info is None else self.copy_framework(info)
+        self.changemap[filename] = res
+        return res
 
     def copy_dylib(self, filename):
         # When the filename is a symlink use the basename of the target of

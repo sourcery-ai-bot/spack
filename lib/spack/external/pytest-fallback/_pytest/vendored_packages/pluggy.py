@@ -103,8 +103,12 @@ class HookspecMarker:
         def setattr_hookspec_opts(func):
             if historic and firstresult:
                 raise ValueError("cannot have a historic firstresult hook")
-            setattr(func, self.project_name + "_spec",
-                   dict(firstresult=firstresult, historic=historic))
+            setattr(
+                func,
+                f"{self.project_name}_spec",
+                dict(firstresult=firstresult, historic=historic),
+            )
+
             return func
 
         if function is not None:
@@ -149,9 +153,17 @@ class HookimplMarker:
 
         """
         def setattr_hookimpl_opts(func):
-            setattr(func, self.project_name + "_impl",
-                   dict(hookwrapper=hookwrapper, optionalhook=optionalhook,
-                        tryfirst=tryfirst, trylast=trylast))
+            setattr(
+                func,
+                f"{self.project_name}_impl",
+                dict(
+                    hookwrapper=hookwrapper,
+                    optionalhook=optionalhook,
+                    tryfirst=tryfirst,
+                    trylast=trylast,
+                ),
+            )
+
             return func
 
         if function is None:
@@ -190,8 +202,11 @@ class _TagTracer:
             "%s%s [%s]\n" % (indent, content, ":".join(tags))
         ]
 
-        for name, value in extra.items():
-            lines.append("%s    %s: %s\n" % (indent, name, value))
+        lines.extend(
+            "%s    %s: %s\n" % (indent, name, value)
+            for name, value in extra.items()
+        )
+
         return lines
 
     def processmessage(self, tags, args):
@@ -273,11 +288,10 @@ class _CallOutcome:
     def get_result(self):
         if self.excinfo is None:
             return self.result
-        else:
-            ex = self.excinfo
-            if _py3:
-                raise ex[1].with_traceback(ex[2])
-            _reraise(*ex)  # noqa
+        ex = self.excinfo
+        if _py3:
+            raise ex[1].with_traceback(ex[2])
+        _reraise(*ex)  # noqa
 
 if not _py3:
     exec("""
@@ -331,7 +345,7 @@ class PluginManager(object):
         self.hook = _HookRelay(self.trace.root.get("hook"))
         self._implprefix = implprefix
         self._inner_hookexec = lambda hook, methods, kwargs: \
-            _MultiCall(methods, kwargs, hook.spec_opts).execute()
+                _MultiCall(methods, kwargs, hook.spec_opts).execute()
 
     def _hookexec(self, hook, methods, kwargs):
         # called from all hookcaller instances.
@@ -376,7 +390,7 @@ class PluginManager(object):
     def parse_hookimpl_opts(self, plugin, name):
         method = getattr(plugin, name)
         try:
-            res = getattr(method, self.project_name + "_impl", None)
+            res = getattr(method, f"{self.project_name}_impl", None)
         except Exception:
             res = {}
         if res is not None and not isinstance(res, dict):
@@ -438,7 +452,7 @@ class PluginManager(object):
 
     def parse_hookspec_opts(self, module_or_class, name):
         method = getattr(module_or_class, name)
-        return getattr(method, self.project_name + "_spec", None)
+        return getattr(method, f"{self.project_name}_spec", None)
 
     def get_plugins(self):
         """ return the set of registered plugins. """
@@ -453,7 +467,7 @@ class PluginManager(object):
         may be registered under a different name which was specified
         by the caller of register(plugin, name). To obtain the name
         of an registered plugin use ``get_name(plugin)`` instead."""
-        return getattr(plugin, "__name__", None) or str(id(plugin))
+        return getattr(plugin, "__name__", None) or id(plugin)
 
     def get_plugin(self, name):
         """ Return a plugin or None for the given name. """
@@ -545,8 +559,9 @@ class PluginManager(object):
         which manages calls to all registered plugins except the
         ones from remove_plugins. """
         orig = getattr(self.hook, name)
-        plugins_to_remove = [plug for plug in remove_plugins if hasattr(plug, name)]
-        if plugins_to_remove:
+        if plugins_to_remove := [
+            plug for plug in remove_plugins if hasattr(plug, name)
+        ]:
             hc = _HookCaller(orig.name, orig._hookexec, orig._specmodule_or_class,
                              orig.spec_opts)
             for hookimpl in (orig._wrappers + orig._nonwrappers):
@@ -643,8 +658,7 @@ def varnames(func, startindex=None):
     except AttributeError:
         x = ()
     else:
-        defaults = func.__defaults__
-        if defaults:
+        if defaults := func.__defaults__:
             x = x[:-len(defaults)]
     try:
         cache["_varnames"] = x
@@ -696,16 +710,12 @@ class _HookCaller(object):
                 if method.plugin == plugin:
                     del wrappers[i]
                     return True
-        if remove(self._wrappers) is None:
-            if remove(self._nonwrappers) is None:
-                raise ValueError("plugin %r not found" % (plugin,))
+
+        if remove(self._wrappers) is None and remove(self._nonwrappers) is None:
+            raise ValueError("plugin %r not found" % (plugin,))
 
     def _add_hookimpl(self, hookimpl):
-        if hookimpl.hookwrapper:
-            methods = self._wrappers
-        else:
-            methods = self._nonwrappers
-
+        methods = self._wrappers if hookimpl.hookwrapper else self._nonwrappers
         if hookimpl.trylast:
             methods.insert(0, hookimpl)
         elif hookimpl.tryfirst:
@@ -770,13 +780,7 @@ class HookCallError(Exception):
 
 if hasattr(inspect, 'signature'):
     def _formatdef(func):
-        return "%s%s" % (
-            func.__name__,
-            str(inspect.signature(func))
-        )
+        return f"{func.__name__}{str(inspect.signature(func))}"
 else:
     def _formatdef(func):
-        return "%s%s" % (
-            func.__name__,
-            inspect.formatargspec(*inspect.getargspec(func))
-        )
+        return f"{func.__name__}{inspect.formatargspec(*inspect.getargspec(func))}"

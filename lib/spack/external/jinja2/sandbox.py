@@ -250,10 +250,14 @@ def modifies_known_mutable(obj, attr):
     >>> modifies_known_mutable("foo", "upper")
     False
     """
-    for typespec, unsafe in _mutable_spec:
-        if isinstance(obj, typespec):
-            return attr in unsafe
-    return False
+    return next(
+        (
+            attr in unsafe
+            for typespec, unsafe in _mutable_spec
+            if isinstance(obj, typespec)
+        ),
+        False,
+    )
 
 
 class SandboxedEnvironment(Environment):
@@ -469,9 +473,11 @@ class ImmutableSandboxedEnvironment(SandboxedEnvironment):
     """
 
     def is_safe_attribute(self, obj, attr, value):
-        if not SandboxedEnvironment.is_safe_attribute(self, obj, attr, value):
-            return False
-        return not modifies_known_mutable(obj, attr)
+        return (
+            not modifies_known_mutable(obj, attr)
+            if SandboxedEnvironment.is_safe_attribute(self, obj, attr, value)
+            else False
+        )
 
 
 # This really is not a public API apparently.
@@ -491,10 +497,7 @@ class SandboxedFormatterMixin(object):
         first, rest = formatter_field_name_split(field_name)
         obj = self.get_value(first, args, kwargs)
         for is_attr, i in rest:
-            if is_attr:
-                obj = self._env.getattr(obj, i)
-            else:
-                obj = self._env.getitem(obj, i)
+            obj = self._env.getattr(obj, i) if is_attr else self._env.getitem(obj, i)
         return obj, first
 
 

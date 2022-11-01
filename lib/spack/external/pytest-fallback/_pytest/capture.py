@@ -359,7 +359,7 @@ class FDCapture:
             self.tmpfile_fd = tmpfile.fileno()
 
     def __repr__(self):
-        return "<FDCapture %s oldfd=%s>" % (self.targetfd, self.targetfd_save)
+        return f"<FDCapture {self.targetfd} oldfd={self.targetfd_save}>"
 
     def start(self):
         """ Start capturing on targetfd using memorized tmpfile. """
@@ -373,8 +373,7 @@ class FDCapture:
     def snap(self):
         f = self.tmpfile
         f.seek(0)
-        res = f.read()
-        if res:
+        if res := f.read():
             enc = getattr(f, "encoding", None)
             if enc and isinstance(res, bytes):
                 res = py.builtin._totext(res, enc, "replace")
@@ -413,10 +412,7 @@ class SysCapture:
         self._old = getattr(sys, name)
         self.name = name
         if tmpfile is None:
-            if name == "stdin":
-                tmpfile = DontReadFromInput()
-            else:
-                tmpfile = CaptureIO()
+            tmpfile = DontReadFromInput() if name == "stdin" else CaptureIO()
         self.tmpfile = tmpfile
 
     def start(self):
@@ -491,10 +487,8 @@ def _colorama_workaround():
 
     if not sys.platform.startswith('win32'):
         return
-    try:
+    with contextlib.suppress(ImportError):
         import colorama  # noqa
-    except ImportError:
-        pass
 
 
 def _readline_workaround():
@@ -518,10 +512,8 @@ def _readline_workaround():
 
     if not sys.platform.startswith('win32'):
         return
-    try:
+    with contextlib.suppress(ImportError):
         import readline  # noqa
-    except ImportError:
-        pass
 
 
 def _py36_windowsconsoleio_workaround(stream):
@@ -560,11 +552,7 @@ def _py36_windowsconsoleio_workaround(stream):
         return
 
     def _reopen_stdio(f, mode):
-        if not buffered and mode[0] == 'w':
-            buffering = 0
-        else:
-            buffering = -1
-
+        buffering = 0 if not buffered and mode[0] == 'w' else -1
         return io.TextIOWrapper(
             open(os.dup(f.fileno()), mode, buffering),
             f.encoding,

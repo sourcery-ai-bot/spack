@@ -76,9 +76,7 @@ class MachOGraph(ObjectGraph):
         if data is not None:
             return data
         newname = self.locate(name, loader=loader)
-        if newname is not None and newname != name:
-            return self.findNode(newname)
-        return None
+        return None if newname is None or newname == name else self.findNode(newname)
 
     def run_file(self, pathname, caller=None):
         assert isinstance(pathname, (str, unicode))

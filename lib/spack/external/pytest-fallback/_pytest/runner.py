@@ -29,9 +29,7 @@ def pytest_terminal_summary(terminalreporter):
     tr = terminalreporter
     dlist = []
     for replist in tr.stats.values():
-        for rep in replist:
-            if hasattr(rep, 'duration'):
-                dlist.append(rep)
+        dlist.extend(rep for rep in replist if hasattr(rep, 'duration'))
     if not dlist:
         return
     dlist.sort(key=lambda x: x.duration)
@@ -39,7 +37,7 @@ def pytest_terminal_summary(terminalreporter):
     if not durations:
         tr.write_sep("=", "slowest test durations")
     else:
-        tr.write_sep("=", "slowest %s test durations" % durations)
+        tr.write_sep("=", f"slowest {durations} test durations")
         dlist = dlist[:durations]
 
     for rep in dlist:
@@ -91,8 +89,7 @@ def show_test_item(item):
     tw.line()
     tw.write(' ' * 8)
     tw.write(item._nodeid)
-    used_fixtures = sorted(item._fixtureinfo.name2fixturedefs.keys())
-    if used_fixtures:
+    if used_fixtures := sorted(item._fixtureinfo.name2fixturedefs.keys()):
         tw.write(' (fixtures used: {0})'.format(', '.join(used_fixtures)))
 
 
@@ -172,7 +169,7 @@ def check_interactive_exception(call, report):
 
 
 def call_runtest_hook(item, when, **kwds):
-    hookname = "pytest_runtest_" + when
+    hookname = f"pytest_runtest_{when}"
     ihook = getattr(item.ihook, hookname)
     return CallInfo(lambda: ihook(item=item, **kwds), when=when)
 
@@ -198,7 +195,7 @@ class CallInfo:
 
     def __repr__(self):
         if self.excinfo:
-            status = "exception: %s" % str(self.excinfo.value)
+            status = f"exception: {str(self.excinfo.value)}"
         else:
             status = "result: %r" % (self.result,)
         return "<CallInfo when=%r %s>" % (self.when, status)
@@ -210,8 +207,10 @@ def getslaveinfoline(node):
     except AttributeError:
         d = node.slaveinfo
         ver = "%s.%s.%s" % d['version_info'][:3]
-        node._slaveinfocache = s = "[%s] %s -- Python %s %s" % (
-            d['id'], d['sysplatform'], ver, d['executable'])
+        node._slaveinfocache = (
+            s
+        ) = f"[{d['id']}] {d['sysplatform']} -- Python {ver} {d['executable']}"
+
         return s
 
 
@@ -285,27 +284,31 @@ def pytest_runtest_makereport(item, call):
     duration = call.stop - call.start
     keywords = dict([(x, 1) for x in item.keywords])
     excinfo = call.excinfo
-    sections = []
     if not call.excinfo:
         outcome = "passed"
         longrepr = None
+    elif not isinstance(excinfo, ExceptionInfo):
+        outcome = "failed"
+        longrepr = excinfo
+    elif excinfo.errisinstance(skip.Exception):
+        outcome = "skipped"
+        r = excinfo._getreprcrash()
+        longrepr = (str(r.path), r.lineno, r.message)
     else:
-        if not isinstance(excinfo, ExceptionInfo):
-            outcome = "failed"
-            longrepr = excinfo
-        elif excinfo.errisinstance(skip.Exception):
-            outcome = "skipped"
-            r = excinfo._getreprcrash()
-            longrepr = (str(r.path), r.lineno, r.message)
-        else:
-            outcome = "failed"
-            if call.when == "call":
-                longrepr = item.repr_failure(excinfo)
-            else:  # exception in setup or teardown
-                longrepr = item._repr_failure_py(excinfo,
-                                                 style=item.config.option.tbstyle)
-    for rwhen, key, content in item._report_sections:
-        sections.append(("Captured %s %s" % (key, rwhen), content))
+        outcome = "failed"
+        longrepr = (
+            item.repr_failure(excinfo)
+            if call.when == "call"
+            else item._repr_failure_py(
+                excinfo, style=item.config.option.tbstyle
+            )
+        )
+
+    sections = [
+        (f"Captured {key} {rwhen}", content)
+        for rwhen, key, content in item._report_sections
+    ]
+
     return TestReport(item.nodeid, item.location,
                       keywords, outcome, longrepr, when,
                       sections, duration)
@@ -474,9 +477,7 @@ class SetupState(object):
         self._teardown_towards(needed_collectors)
 
     def _teardown_towards(self, needed_collectors):
-        while self.stack:
-            if self.stack == needed_collectors[:len(self.stack)]:
-                break
+        while self.stack and self.stack != needed_collectors[: len(self.stack)]:
             self._pop_and_teardown()
 
     def prepare(self, colitem):

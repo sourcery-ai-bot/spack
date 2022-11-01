@@ -36,10 +36,10 @@ class FormatChecker(object):
         if formats is None:
             self.checkers = self.checkers.copy()
         else:
-            self.checkers = dict((k, self.checkers[k]) for k in formats)
+            self.checkers = {k: self.checkers[k] for k in formats}
 
     def __repr__(self):
-        return "<FormatChecker checkers={}>".format(sorted(self.checkers))
+        return f"<FormatChecker checkers={sorted(self.checkers)}>"
 
     def checks(self, format, raises=()):
         """
@@ -179,9 +179,7 @@ def _checks_drafts(
 @_checks_drafts(name="idn-email")
 @_checks_drafts(name="email")
 def is_email(instance):
-    if not isinstance(instance, str_types):
-        return True
-    return "@" in instance
+    return "@" in instance if isinstance(instance, str_types) else True
 
 
 _ipv4_re = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
@@ -193,9 +191,11 @@ _ipv4_re = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 def is_ipv4(instance):
     if not isinstance(instance, str_types):
         return True
-    if not _ipv4_re.match(instance):
-        return False
-    return all(0 <= int(component) <= 255 for component in instance.split("."))
+    return (
+        all(0 <= int(component) <= 255 for component in instance.split("."))
+        if _ipv4_re.match(instance)
+        else False
+    )
 
 
 if hasattr(socket, "inet_pton"):
@@ -205,9 +205,11 @@ if hasattr(socket, "inet_pton"):
         name="ipv6", raises=(socket.error, struct.error, ValueError),
     )
     def is_ipv6(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return socket.inet_pton(socket.AF_INET6, instance)
+        return (
+            socket.inet_pton(socket.AF_INET6, instance)
+            if isinstance(instance, str_types)
+            else True
+        )
 
 
 _host_name_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9\.\-]{1,255}$")
@@ -225,10 +227,7 @@ def is_host_name(instance):
     if not _host_name_re.match(instance):
         return False
     components = instance.split(".")
-    for component in components:
-        if len(component) > 63:
-            return False
-    return True
+    return all(len(component) <= 63 for component in components)
 
 
 try:
@@ -255,9 +254,11 @@ except ImportError:
     else:
         @_checks_drafts(name="uri")
         def is_uri(instance):
-            if not isinstance(instance, str_types):
-                return True
-            return validate_rfc3986(instance, rule="URI")
+            return (
+                validate_rfc3986(instance, rule="URI")
+                if isinstance(instance, str_types)
+                else True
+            )
 
         @_checks_drafts(
             draft6="uri-reference",
@@ -265,28 +266,36 @@ except ImportError:
             raises=ValueError,
         )
         def is_uri_reference(instance):
-            if not isinstance(instance, str_types):
-                return True
-            return validate_rfc3986(instance, rule="URI_reference")
+            return (
+                validate_rfc3986(instance, rule="URI_reference")
+                if isinstance(instance, str_types)
+                else True
+            )
 
 else:
     @_checks_drafts(draft7="iri", raises=ValueError)
     def is_iri(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return rfc3987.parse(instance, rule="IRI")
+        return (
+            rfc3987.parse(instance, rule="IRI")
+            if isinstance(instance, str_types)
+            else True
+        )
 
     @_checks_drafts(draft7="iri-reference", raises=ValueError)
     def is_iri_reference(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return rfc3987.parse(instance, rule="IRI_reference")
+        return (
+            rfc3987.parse(instance, rule="IRI_reference")
+            if isinstance(instance, str_types)
+            else True
+        )
 
     @_checks_drafts(name="uri", raises=ValueError)
     def is_uri(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return rfc3987.parse(instance, rule="URI")
+        return (
+            rfc3987.parse(instance, rule="URI")
+            if isinstance(instance, str_types)
+            else True
+        )
 
     @_checks_drafts(
         draft6="uri-reference",
@@ -294,9 +303,11 @@ else:
         raises=ValueError,
     )
     def is_uri_reference(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return rfc3987.parse(instance, rule="URI_reference")
+        return (
+            rfc3987.parse(instance, rule="URI_reference")
+            if isinstance(instance, str_types)
+            else True
+        )
 
 
 try:
@@ -310,36 +321,38 @@ except ImportError:
 if validate_rfc3339:
     @_checks_drafts(name="date-time")
     def is_datetime(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return validate_rfc3339(instance)
+        return validate_rfc3339(instance) if isinstance(instance, str_types) else True
 
     @_checks_drafts(draft7="time")
     def is_time(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return is_datetime("1970-01-01T" + instance)
+        return (
+            is_datetime(f"1970-01-01T{instance}")
+            if isinstance(instance, str_types)
+            else True
+        )
 
 
 @_checks_drafts(name="regex", raises=re.error)
 def is_regex(instance):
-    if not isinstance(instance, str_types):
-        return True
-    return re.compile(instance)
+    return re.compile(instance) if isinstance(instance, str_types) else True
 
 
 @_checks_drafts(draft3="date", draft7="date", raises=ValueError)
 def is_date(instance):
-    if not isinstance(instance, str_types):
-        return True
-    return datetime.datetime.strptime(instance, "%Y-%m-%d")
+    return (
+        datetime.datetime.strptime(instance, "%Y-%m-%d")
+        if isinstance(instance, str_types)
+        else True
+    )
 
 
 @_checks_drafts(draft3="time", raises=ValueError)
 def is_draft3_time(instance):
-    if not isinstance(instance, str_types):
-        return True
-    return datetime.datetime.strptime(instance, "%H:%M:%S")
+    return (
+        datetime.datetime.strptime(instance, "%H:%M:%S")
+        if isinstance(instance, str_types)
+        else True
+    )
 
 
 try:
@@ -376,9 +389,11 @@ else:
         raises=jsonpointer.JsonPointerException,
     )
     def is_json_pointer(instance):
-        if not isinstance(instance, str_types):
-            return True
-        return jsonpointer.JsonPointer(instance)
+        return (
+            jsonpointer.JsonPointer(instance)
+            if isinstance(instance, str_types)
+            else True
+        )
 
     # TODO: I don't want to maintain this, so it
     #       needs to go either into jsonpointer (pending

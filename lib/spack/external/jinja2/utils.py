@@ -93,8 +93,6 @@ def is_undefined(obj):
 
 def consume(iterable):
     """Consumes an iterable without doing anything with it."""
-    for _ in iterable:
-        pass
 
 
 def clear_caches():
@@ -138,10 +136,7 @@ def open_if_exists(filename, mode="rb"):
     """Returns a file descriptor for the filename if that file exists,
     otherwise ``None``.
     """
-    if not os.path.isfile(filename):
-        return None
-
-    return open(filename, mode)
+    return open(filename, mode) if os.path.isfile(filename) else None
 
 
 def object_type_repr(obj):
@@ -160,9 +155,9 @@ def object_type_repr(obj):
     if cls.__module__ in ("__builtin__", "builtins"):
         name = cls.__name__
     else:
-        name = cls.__module__ + "." + cls.__name__
+        name = f"{cls.__module__}.{cls.__name__}"
 
-    return "%s object" % name
+    return f"{name} object"
 
 
 def pformat(obj, verbose=False):
@@ -204,9 +199,7 @@ def urlize(text, trim_url_limit=None, rel=None, target=None):
 
     for i, word in enumerate(words):
         head, middle, tail = "", word, ""
-        match = re.match(r"^([(<]|&lt;)+", middle)
-
-        if match:
+        if match := re.match(r"^([(<]|&lt;)+", middle):
             head = match.group()
             middle = middle[match.end() :]
 
@@ -214,9 +207,7 @@ def urlize(text, trim_url_limit=None, rel=None, target=None):
         # need to check that the string ends with any of the characters
         # before trying to match all of them, to avoid backtracking.
         if middle.endswith((")", ">", ".", ",", "\n", "&gt;")):
-            match = re.search(r"([)>.,\n]|&gt;)+$", middle)
-
-            if match:
+            if match := re.search(r"([)>.,\n]|&gt;)+$", middle):
                 tail = match.group()
                 middle = middle[: match.start()]
 
@@ -299,14 +290,16 @@ def generate_lorem_ipsum(n=5, html=True, min=20, max=100):
         # ensure that the paragraph ends with a dot.
         p = u" ".join(p)
         if p.endswith(","):
-            p = p[:-1] + "."
+            p = f"{p[:-1]}."
         elif not p.endswith("."):
             p += "."
         result.append(p)
 
-    if not html:
-        return u"\n\n".join(result)
-    return Markup(u"\n".join(u"<p>%s</p>" % escape(x) for x in result))
+    return (
+        Markup(u"\n".join(f"<p>{escape(x)}</p>" for x in result))
+        if html
+        else u"\n\n".join(result)
+    )
 
 
 def unicode_urlencode(obj, charset="utf-8", for_qs=False):
@@ -588,9 +581,7 @@ def select_autoescape(
         template_name = template_name.lower()
         if template_name.endswith(enabled_patterns):
             return True
-        if template_name.endswith(disabled_patterns):
-            return False
-        return default
+        return False if template_name.endswith(disabled_patterns) else default
 
     return autoescape
 
@@ -672,9 +663,8 @@ class Cycler(object):
         """Return the current item, then advance :attr:`current` to the
         next item.
         """
-        rv = self.current
         self.pos = (self.pos + 1) % len(self.items)
-        return rv
+        return self.current
 
     __next__ = next
 

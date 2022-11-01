@@ -73,8 +73,7 @@ class ApproxNumpy(ApproxBase):
     def __repr__(self):
         # It might be nice to rewrite this function to account for the
         # shape of the array...
-        return "approx({0!r})".format(list(
-            self._approx_scalar(x) for x in self.expected))
+        return "approx({0!r})".format([self._approx_scalar(x) for x in self.expected])
 
     if sys.version_info[0] == 2:
         __cmp__ = _cmp_raises_type_error
@@ -109,9 +108,9 @@ class ApproxMapping(ApproxBase):
     """
 
     def __repr__(self):
-        return "approx({0!r})".format(dict(
-            (k, self._approx_scalar(v))
-            for k, v in self.expected.items()))
+        return "approx({0!r})".format(
+            {k: self._approx_scalar(v) for k, v in self.expected.items()}
+        )
 
     def __eq__(self, actual):
         if set(actual.keys()) != set(self.expected.keys()):
@@ -231,9 +230,8 @@ class ApproxScalar(ApproxBase):
 
         # If the user specified an absolute tolerance but not a relative one,
         # just return the absolute tolerance.
-        if self.rel is None:
-            if self.abs is not None:
-                return absolute_tolerance
+        if self.rel is None and self.abs is not None:
+            return absolute_tolerance
 
         # Figure out what the relative tolerance should be.  ``self.rel`` is
         # either None or a value specified by the user.  This is done after
@@ -613,13 +611,9 @@ class RaisesContext(object):
         __tracebackhide__ = True
         if tp[0] is None:
             fail(self.message)
-        if sys.version_info < (2, 7):
-            # py26: on __exit__() exc_value often does not contain the
-            # exception value.
-            # http://bugs.python.org/issue7853
-            if not isinstance(tp[1], BaseException):
-                exc_type, value, traceback = tp
-                tp = exc_type, exc_type(value), traceback
+        if sys.version_info < (2, 7) and not isinstance(tp[1], BaseException):
+            exc_type, value, traceback = tp
+            tp = exc_type, exc_type(value), traceback
         self.excinfo.__init__(tp)
         suppress_exception = issubclass(self.excinfo.type, self.expected_exception)
         if sys.version_info[0] == 2 and suppress_exception:

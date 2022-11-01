@@ -17,9 +17,7 @@ def is_bool(checker, instance):
 
 def is_integer(checker, instance):
     # bool inherits from int, so ensure bools aren't reported as ints
-    if isinstance(instance, bool):
-        return False
-    return isinstance(instance, int_types)
+    return False if isinstance(instance, bool) else isinstance(instance, int_types)
 
 
 def is_null(checker, instance):

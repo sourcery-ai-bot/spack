@@ -35,9 +35,7 @@ def optional(converter):
     """
 
     def optional_converter(val):
-        if val is None:
-            return None
-        return converter(val)
+        return None if val is None else converter(val)
 
     if not PY2:
         sig = None
@@ -95,17 +93,11 @@ def default_if_none(default=NOTHING, factory=None):
             )
 
         def default_if_none_converter(val):
-            if val is not None:
-                return val
-
-            return default.factory()
+            return val if val is not None else default.factory()
 
     else:
 
         def default_if_none_converter(val):
-            if val is not None:
-                return val
-
-            return default
+            return val if val is not None else default
 
     return default_if_none_converter

@@ -22,11 +22,7 @@ def print_file(fp, path):
     for header in m.headers:
         seen = set()
 
-        if header.MH_MAGIC == MH_MAGIC_64 or header.MH_MAGIC == MH_CIGAM_64:
-            sz = "64-bit"
-        else:
-            sz = "32-bit"
-
+        sz = "64-bit" if header.MH_MAGIC in [MH_MAGIC_64, MH_CIGAM_64] else "32-bit"
         arch = CPU_TYPE_NAMES.get(header.header.cputype, header.header.cputype)
 
         subarch = get_cpu_subtype(header.header.cputype, header.header.cpusubtype)

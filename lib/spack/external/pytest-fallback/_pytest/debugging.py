@@ -52,8 +52,7 @@ class pytestPDB:
         import _pytest.config
         frame = sys._getframe().f_back
         if cls._pluginmanager is not None:
-            capman = cls._pluginmanager.getplugin("capturemanager")
-            if capman:
+            if capman := cls._pluginmanager.getplugin("capturemanager"):
                 capman.suspendcapture(in_=True)
             tw = _pytest.config.create_terminal_writer(cls._config)
             tw.line()
@@ -64,8 +63,7 @@ class pytestPDB:
 
 class PdbInvoke:
     def pytest_exception_interact(self, node, call, report):
-        capman = node.config.pluginmanager.getplugin("capturemanager")
-        if capman:
+        if capman := node.config.pluginmanager.getplugin("capturemanager"):
             out, err = capman.suspendcapture(in_=True)
             sys.stdout.write(out)
             sys.stdout.write(err)

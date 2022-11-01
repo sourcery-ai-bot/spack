@@ -16,7 +16,7 @@ def alias(name, warning=None):
         warnings.warn(warning, stacklevel=2)
         return getter(self)
 
-    return property(getter if warning is None else warned, doc='alias for ' + name)
+    return property(getter if warning is None else warned, doc=f'alias for {name}')
 
 
 class ParameterSet(namedtuple('ParameterSet', 'values, marks, id')):
@@ -69,7 +69,7 @@ class ParameterSet(namedtuple('ParameterSet', 'values, marks, id')):
 
     @property
     def deprecated_arg_dict(self):
-        return dict((mark.name, mark) for mark in self.marks)
+        return {mark.name: mark for mark in self.marks}
 
 
 class MarkerError(Exception):
@@ -120,7 +120,7 @@ def pytest_cmdline_main(config):
         tw = _pytest.config.create_terminal_writer(config)
         for line in config.getini("markers"):
             name, rest = line.split(":", 1)
-            tw.write("@pytest.mark.%s:" % name, bold=True)
+            tw.write(f"@pytest.mark.{name}:", bold=True)
             tw.line(rest)
             tw.line()
         config._ensure_unconfigure()
@@ -139,7 +139,7 @@ def pytest_collection_modifyitems(items, config):
     # but today we just allow "-" at the beginning, use "not" instead
     # we probably remove "-" altogether soon
     if keywordexpr.startswith("-"):
-        keywordexpr = "not " + keywordexpr[1:]
+        keywordexpr = f"not {keywordexpr[1:]}"
     selectuntil = False
     if keywordexpr[-1:] == ":":
         selectuntil = True
@@ -153,10 +153,9 @@ def pytest_collection_modifyitems(items, config):
         else:
             if selectuntil:
                 keywordexpr = None
-            if matchexpr:
-                if not matchmark(colitem, matchexpr):
-                    deselected.append(colitem)
-                    continue
+            if matchexpr and not matchmark(colitem, matchexpr):
+                deselected.append(colitem)
+                continue
             remaining.append(colitem)
 
     if deselected:
@@ -169,10 +168,12 @@ class MarkMapping:
     resolves to True if the marker is present. """
 
     def __init__(self, keywords):
-        mymarks = set()
-        for key, value in keywords.items():
-            if isinstance(value, MarkInfo) or isinstance(value, MarkDecorator):
-                mymarks.add(key)
+        mymarks = {
+            key
+            for key, value in keywords.items()
+            if isinstance(value, (MarkInfo, MarkDecorator))
+        }
+
         self._mymarks = mymarks
 
     def __getitem__(self, name):
@@ -188,10 +189,7 @@ class KeywordMapping:
         self._names = names
 
     def __getitem__(self, subname):
-        for name in self._names:
-            if subname in name:
-                return True
-        return False
+        return any(subname in name for name in self._names)
 
 
 def matchmark(colitem, markexpr):
@@ -208,13 +206,13 @@ def matchkeyword(colitem, keywordexpr):
     Additionally, matches on names in the 'extra_keyword_matches' set of
     any item, as well as names directly assigned to test functions.
     """
-    mapped_names = set()
-
     # Add the names of the current item and any parent items
     import pytest
-    for item in colitem.listchain():
-        if not isinstance(item, pytest.Instance):
-            mapped_names.add(item.name)
+    mapped_names = {
+        item.name
+        for item in colitem.listchain()
+        if not isinstance(item, pytest.Instance)
+    }
 
     # Add the names added as extra keywords to current or parent items
     for name in colitem.listextrakeywords():
@@ -355,11 +353,9 @@ class MarkDecorator:
             func = args[0]
             is_class = inspect.isclass(func)
             if len(args) == 1 and (istestfunc(func) or is_class):
-                if is_class:
-                    store_mark(func, self.mark)
-                else:
+                if not is_class:
                     store_legacy_markinfo(func, self.mark)
-                    store_mark(func, self.mark)
+                store_mark(func, self.mark)
                 return func
         return self.with_args(*args, **kwargs)
 

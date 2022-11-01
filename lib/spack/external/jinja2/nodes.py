@@ -46,16 +46,15 @@ class NodeType(type):
     inheritance.  fields and attributes from the parent class are
     automatically forwarded to the child."""
 
-    def __new__(mcs, name, bases, d):
+    def __new__(cls, name, bases, d):
         for attr in "fields", "attributes":
-            storage = []
-            storage.extend(getattr(bases[0], attr, ()))
+            storage = list(getattr(bases[0], attr, ()))
             storage.extend(d.get(attr, ()))
             assert len(bases) == 1, "multiple inheritance not allowed"
             assert len(storage) == len(set(storage)), "layout conflict"
             d[attr] = tuple(storage)
         d.setdefault("abstract", False)
-        return type.__new__(mcs, name, bases, d)
+        return type.__new__(cls, name, bases, d)
 
 
 class EvalContext(object):
@@ -179,8 +178,7 @@ class Node(with_metaclass(NodeType, object)):
         for child in self.iter_child_nodes():
             if isinstance(child, node_type):
                 yield child
-            for result in child.find_all(node_type):
-                yield result
+            yield from child.find_all(node_type)
 
     def set_ctx(self, ctx):
         """Reset the context of a node and all child nodes.  Per default the
@@ -201,9 +199,8 @@ class Node(with_metaclass(NodeType, object)):
         todo = deque([self])
         while todo:
             node = todo.popleft()
-            if "lineno" in node.attributes:
-                if node.lineno is None or override:
-                    node.lineno = lineno
+            if "lineno" in node.attributes and (node.lineno is None or override):
+                node.lineno = lineno
             todo.extend(node.iter_child_nodes())
         return self
 
@@ -228,10 +225,7 @@ class Node(with_metaclass(NodeType, object)):
     __hash__ = object.__hash__
 
     def __repr__(self):
-        return "%s(%s)" % (
-            self.__class__.__name__,
-            ", ".join("%s=%r" % (arg, getattr(self, arg, None)) for arg in self.fields),
-        )
+        return f'{self.__class__.__name__}({", ".join("%s=%r" % (arg, getattr(self, arg, None)) for arg in self.fields)})'
 
     def dump(self):
         def _dump(node):
@@ -239,7 +233,7 @@ class Node(with_metaclass(NodeType, object)):
                 buf.append(repr(node))
                 return
 
-            buf.append("nodes.%s(" % node.__class__.__name__)
+            buf.append(f"nodes.{node.__class__.__name__}(")
             if not node.fields:
                 buf.append(")")
                 return
@@ -544,9 +538,7 @@ class TemplateData(Literal):
         eval_ctx = get_eval_context(self, eval_ctx)
         if eval_ctx.volatile:
             raise Impossible()
-        if eval_ctx.autoescape:
-            return Markup(self.data)
-        return self.data
+        return Markup(self.data) if eval_ctx.autoescape else self.data
 
 
 class Tuple(Literal):
@@ -562,10 +554,7 @@ class Tuple(Literal):
         return tuple(x.as_const(eval_ctx) for x in self.items)
 
     def can_assign(self):
-        for item in self.items:
-            if not item.can_assign():
-                return False
-        return True
+        return all(item.can_assign() for item in self.items)
 
 
 class List(Literal):
@@ -641,7 +630,7 @@ def args_as_const(node, eval_ctx):
 
     if node.dyn_kwargs is not None:
         try:
-            kwargs.update(node.dyn_kwargs.as_const(eval_ctx))
+            kwargs |= node.dyn_kwargs.as_const(eval_ctx)
         except Exception:
             raise Impossible()
 
@@ -671,7 +660,7 @@ class Filter(Expr):
         # python 3.  because of that, do not rename filter_ to filter!
         filter_ = self.environment.filters.get(self.name)
 
-        if filter_ is None or getattr(filter_, "contextfilter", False) is True:
+        if filter_ is None or getattr(filter_, "contextfilter", False):
             raise Impossible()
 
         # We cannot constant handle async filters, so we need to make sure
@@ -684,9 +673,9 @@ class Filter(Expr):
         args, kwargs = args_as_const(self, eval_ctx)
         args.insert(0, self.node.as_const(eval_ctx))
 
-        if getattr(filter_, "evalcontextfilter", False) is True:
+        if getattr(filter_, "evalcontextfilter", False):
             args.insert(0, eval_ctx)
-        elif getattr(filter_, "environmentfilter", False) is True:
+        elif getattr(filter_, "environmentfilter", False):
             args.insert(0, self.environment)
 
         try:
@@ -780,9 +769,7 @@ class Slice(Expr):
         eval_ctx = get_eval_context(self, eval_ctx)
 
         def const(obj):
-            if obj is None:
-                return None
-            return obj.as_const(eval_ctx)
+            return None if obj is None else obj.as_const(eval_ctx)
 
         return slice(const(self.start), const(self.stop), const(self.step))
 
@@ -834,10 +821,13 @@ class Operand(Helper):
 if __debug__:
     Operand.__doc__ += "\nThe following operators are available: " + ", ".join(
         sorted(
-            "``%s``" % x
-            for x in set(_binop_to_func) | set(_uaop_to_func) | set(_cmpop_to_func)
+            f"``{x}``"
+            for x in set(_binop_to_func)
+            | set(_uaop_to_func)
+            | set(_cmpop_to_func)
         )
     )
+
 
 
 class Mul(BinExpr):
@@ -995,9 +985,7 @@ class MarkSafeIfAutoescape(Expr):
         if eval_ctx.volatile:
             raise Impossible()
         expr = self.expr.as_const(eval_ctx)
-        if eval_ctx.autoescape:
-            return Markup(expr)
-        return expr
+        return Markup(expr) if eval_ctx.autoescape else expr
 
 
 class ContextReference(Expr):

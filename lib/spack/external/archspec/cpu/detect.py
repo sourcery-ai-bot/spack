@@ -103,12 +103,7 @@ def _machine():
         ["sysctl", "-n", "machdep.cpu.brand_string"], env=_ensure_bin_usrbin_in_path()
     ).strip()
 
-    if "Apple" in output:
-        # Note that a native Python interpreter on Apple M1 would return
-        # "arm64" instead of "aarch64". Here we normalize to the latter.
-        return "aarch64"
-
-    return "x86_64"
+    return "aarch64" if "Apple" in output else "x86_64"
 
 
 @info_dict(operating_system="Darwin")
@@ -166,7 +161,7 @@ def adjust_raw_flags(info):
     d2l = TARGETS_JSON["conversions"]["darwin_flags"]
     for darwin_flag, linux_flag in d2l.items():
         if darwin_flag in flags:
-            info["flags"] += " " + linux_flag
+            info["flags"] += f" {linux_flag}"
 
 
 def adjust_raw_vendor(info):
@@ -247,12 +242,7 @@ def host():
     candidates = [c for c in candidates if c > best_generic]
 
     # If we don't have candidates, return the best generic micro-architecture
-    if not candidates:
-        return best_generic
-
-    # Reverse sort of the depth for the inheritance tree among only targets we
-    # can use. This gets the newest target we satisfy.
-    return max(candidates, key=sorting_fn)
+    return max(candidates, key=sorting_fn) if candidates else best_generic
 
 
 def compatibility_check(architecture_family):
@@ -283,7 +273,7 @@ def compatibility_check_for_power(info, target):
     basename = platform.machine()
     generation_match = re.search(r"POWER(\d+)", info.get("cpu", ""))
     try:
-        generation = int(generation_match.group(1))
+        generation = int(generation_match[1])
     except AttributeError:
         # There might be no match under emulated environments. For instance
         # emulating a ppc64le with QEMU and Docker still reports the host
@@ -338,12 +328,7 @@ def compatibility_check_for_riscv64(info, target):
     uarch = info.get("uarch")
 
     # sifive unmatched board
-    if uarch == "sifive,u74-mc":
-        uarch = "u74mc"
-    # catch-all for unknown uarchs
-    else:
-        uarch = "riscv64"
-
+    uarch = "u74mc" if uarch == "sifive,u74-mc" else "riscv64"
     arch_root = TARGETS[basename]
     return (target == arch_root or arch_root in target.ancestors) and (
         target == uarch or target.vendor == "generic"

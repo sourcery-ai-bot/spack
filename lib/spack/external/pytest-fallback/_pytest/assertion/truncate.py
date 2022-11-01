@@ -62,16 +62,17 @@ def _truncate_explanation(input_lines, max_lines=None, max_chars=None):
     truncated_explanation = _truncate_by_char_count(truncated_explanation, max_chars)
 
     # Add ellipsis to final line
-    truncated_explanation[-1] = truncated_explanation[-1] + "..."
+    truncated_explanation[-1] = f"{truncated_explanation[-1]}..."
 
     # Append useful message to explanation
     truncated_line_count = len(input_lines) - len(truncated_explanation)
     truncated_line_count += 1  # Account for the part-truncated final line
-    msg = '...Full output truncated'
-    if truncated_line_count == 1:
-        msg += ' ({0} line hidden)'.format(truncated_line_count)
-    else:
-        msg += ' ({0} lines hidden)'.format(truncated_line_count)
+    msg = '...Full output truncated' + (
+        ' ({0} line hidden)'.format(truncated_line_count)
+        if truncated_line_count == 1
+        else ' ({0} lines hidden)'.format(truncated_line_count)
+    )
+
     msg += ", {0}" .format(USAGE_MSG)
     truncated_explanation.extend([
         py.builtin._totext(""),

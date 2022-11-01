@@ -70,7 +70,7 @@ def ansi_print(text, esc, file=None, newline=True, flush=False):
     if esc and win32_and_ctypes and file.isatty():
         if 1 in esc:
             bold = True
-            esc = tuple([x for x in esc if x != 1])
+            esc = tuple(x for x in esc if x != 1)
         else:
             bold = False
         esctable = {()   : FOREGROUND_WHITE,                 # normal
@@ -86,11 +86,11 @@ def ansi_print(text, esc, file=None, newline=True, flush=False):
         attr = esctable.get(esc, FOREGROUND_WHITE)
         if bold:
             attr |= FOREGROUND_INTENSITY
-        STD_OUTPUT_HANDLE = -11
-        STD_ERROR_HANDLE = -12
         if file is sys.stderr:
+            STD_ERROR_HANDLE = -12
             handle = GetStdHandle(STD_ERROR_HANDLE)
         else:
+            STD_OUTPUT_HANDLE = -11
             handle = GetStdHandle(STD_OUTPUT_HANDLE)
         oldcolors = GetConsoleInfo(handle).wAttributes
         attr |= (oldcolors & 0x0f0)
@@ -183,7 +183,7 @@ class TerminalWriter(object):
             #         N <= (fullwidth - len(title) - 2) // (2*len(sepchar))
             N = (fullwidth - len(title) - 2) // (2*len(sepchar))
             fill = sepchar * N
-            line = "%s %s %s" % (fill, title, fill)
+            line = f"{fill} {title} {fill}"
         else:
             # we want len(sepchar)*N <= fullwidth
             # i.e.    N <= fullwidth // len(sepchar)
@@ -200,10 +200,7 @@ class TerminalWriter(object):
         if msg:
             if not isinstance(msg, (bytes, text)):
                 msg = text(msg)
-            if self.hasmarkup and kw:
-                markupmsg = self.markup(msg, **kw)
-            else:
-                markupmsg = msg
+            markupmsg = self.markup(msg, **kw) if self.hasmarkup and kw else msg
             write_out(self._file, markupmsg)
 
     def line(self, s='', **kw):
@@ -226,33 +223,34 @@ class TerminalWriter(object):
 
 class Win32ConsoleWriter(TerminalWriter):
     def write(self, msg, **kw):
-        if msg:
-            if not isinstance(msg, (bytes, text)):
-                msg = text(msg)
-            oldcolors = None
-            if self.hasmarkup and kw:
-                handle = GetStdHandle(STD_OUTPUT_HANDLE)
-                oldcolors = GetConsoleInfo(handle).wAttributes
-                default_bg = oldcolors & 0x00F0
-                attr = default_bg
-                if kw.pop('bold', False):
-                    attr |= FOREGROUND_INTENSITY
+        if not msg:
+            return
+        if not isinstance(msg, (bytes, text)):
+            msg = text(msg)
+        oldcolors = None
+        if self.hasmarkup and kw:
+            handle = GetStdHandle(STD_OUTPUT_HANDLE)
+            oldcolors = GetConsoleInfo(handle).wAttributes
+            default_bg = oldcolors & 0x00F0
+            attr = default_bg
+            if kw.pop('bold', False):
+                attr |= FOREGROUND_INTENSITY
 
-                if kw.pop('red', False):
-                    attr |= FOREGROUND_RED
-                elif kw.pop('blue', False):
-                    attr |= FOREGROUND_BLUE
-                elif kw.pop('green', False):
-                    attr |= FOREGROUND_GREEN
-                elif kw.pop('yellow', False):
-                    attr |= FOREGROUND_GREEN|FOREGROUND_RED
-                else:
-                    attr |= oldcolors & 0x0007
+            if kw.pop('red', False):
+                attr |= FOREGROUND_RED
+            elif kw.pop('blue', False):
+                attr |= FOREGROUND_BLUE
+            elif kw.pop('green', False):
+                attr |= FOREGROUND_GREEN
+            elif kw.pop('yellow', False):
+                attr |= FOREGROUND_GREEN|FOREGROUND_RED
+            else:
+                attr |= oldcolors & 0x0007
 
-                SetConsoleTextAttribute(handle, attr)
-            write_out(self._file, msg)
-            if oldcolors:
-                SetConsoleTextAttribute(handle, oldcolors)
+            SetConsoleTextAttribute(handle, attr)
+        write_out(self._file, msg)
+        if oldcolors:
+            SetConsoleTextAttribute(handle, oldcolors)
 
 class WriteFile(object):
     def __init__(self, writemethod, encoding=None):

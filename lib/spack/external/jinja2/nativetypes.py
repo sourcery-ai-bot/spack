@@ -53,10 +53,7 @@ class NativeCodeGenerator(CodeGenerator):
         if not has_safe_repr(const):
             raise nodes.Impossible()
 
-        if isinstance(node, nodes.TemplateData):
-            return const
-
-        return finalize.const(const)
+        return const if isinstance(node, nodes.TemplateData) else finalize.const(const)
 
     def _output_child_pre(self, node, frame, finalize):
         if finalize.src is not None:

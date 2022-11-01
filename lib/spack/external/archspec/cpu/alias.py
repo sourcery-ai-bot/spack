@@ -20,9 +20,9 @@ class FeatureAliasTest(object):
     # pylint: disable=too-few-public-methods
     def __init__(self, rules):
         self.rules = rules
-        self.predicates = []
-        for name, args in rules.items():
-            self.predicates.append(_FEATURE_ALIAS_PREDICATE[name](args))
+        self.predicates = [
+            _FEATURE_ALIAS_PREDICATE[name](args) for name, args in rules.items()
+        ]
 
     def __call__(self, microarchitecture):
         return all(feature_test(microarchitecture) for feature_test in self.predicates)
@@ -31,10 +31,7 @@ class FeatureAliasTest(object):
 def _feature_aliases():
     """Returns the dictionary of all defined feature aliases."""
     json_data = TARGETS_JSON["feature_aliases"]
-    aliases = {}
-    for alias, rules in json_data.items():
-        aliases[alias] = FeatureAliasTest(rules)
-    return aliases
+    return {alias: FeatureAliasTest(rules) for alias, rules in json_data.items()}
 
 
 FEATURE_ALIASES = LazyDictionary(_feature_aliases)

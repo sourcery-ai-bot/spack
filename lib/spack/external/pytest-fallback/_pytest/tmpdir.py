@@ -34,11 +34,14 @@ class TempdirFactory:
         prefix greater than any existing one.
         """
         basetemp = self.getbasetemp()
-        if not numbered:
-            p = basetemp.mkdir(basename)
-        else:
-            p = py.path.local.make_numbered_dir(prefix=basename,
-                                                keep=0, rootdir=basetemp, lock_timeout=None)
+        p = (
+            py.path.local.make_numbered_dir(
+                prefix=basename, keep=0, rootdir=basetemp, lock_timeout=None
+            )
+            if numbered
+            else basetemp.mkdir(basename)
+        )
+
         self.trace("mktemp", p)
         return p
 
@@ -55,11 +58,10 @@ class TempdirFactory:
                 basetemp.mkdir()
             else:
                 temproot = py.path.local.get_temproot()
-                user = get_user()
-                if user:
+                if user := get_user():
                     # use a sub-directory in the temproot to speed-up
                     # make_numbered_dir() call
-                    rootdir = temproot.join('pytest-of-%s' % user)
+                    rootdir = temproot.join(f'pytest-of-{user}')
                 else:
                     rootdir = temproot
                 rootdir.ensure(dir=1)
@@ -122,5 +124,4 @@ def tmpdir(request, tmpdir_factory):
     MAXVAL = 30
     if len(name) > MAXVAL:
         name = name[:MAXVAL]
-    x = tmpdir_factory.mktemp(name, numbered=True)
-    return x
+    return tmpdir_factory.mktemp(name, numbered=True)

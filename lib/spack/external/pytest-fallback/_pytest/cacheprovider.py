@@ -67,7 +67,7 @@ class Cache(object):
                 with path.open("r") as f:
                     return json.load(f)
             except ValueError:
-                self.trace("cache-invalid at %s" % (path,))
+                self.trace(f"cache-invalid at {path}")
         return default
 
     def set(self, key, value):
@@ -83,15 +83,12 @@ class Cache(object):
         try:
             path.dirpath().ensure_dir()
         except (py.error.EEXIST, py.error.EACCES):
-            self.config.warn(
-                code='I9', message='could not create cache path %s' % (path,)
-            )
+            self.config.warn(code='I9', message=f'could not create cache path {path}')
             return
         try:
             f = path.open('w')
         except py.error.ENOTDIR:
-            self.config.warn(
-                code='I9', message='cache could not write path %s' % (path,))
+            self.config.warn(code='I9', message=f'cache could not write path {path}')
         else:
             with f:
                 self.trace("cache-write %s: %r" % (key, value,))
@@ -118,7 +115,7 @@ class LFPlugin:
                 mode = "rerun previous {count} {noun}{suffix}".format(
                     count=self._previously_failed_count, suffix=suffix, noun=noun
                 )
-            return "run-last-failure: %s" % mode
+            return f"run-last-failure: {mode}"
 
     def pytest_runtest_logreport(self, report):
         if (report.when == 'call' and report.passed) or report.skipped:
@@ -220,32 +217,31 @@ def cache(request):
 def pytest_report_header(config):
     if config.option.verbose:
         relpath = py.path.local().bestrelpath(config.cache._cachedir)
-        return "cachedir: %s" % relpath
+        return f"cachedir: {relpath}"
 
 
 def cacheshow(config, session):
     from pprint import pprint
     tw = py.io.TerminalWriter()
-    tw.line("cachedir: " + str(config.cache._cachedir))
+    tw.line(f"cachedir: {str(config.cache._cachedir)}")
     if not config.cache._cachedir.check():
         tw.line("cache is empty")
         return 0
-    dummy = object()
     basedir = config.cache._cachedir
     vdir = basedir.join("v")
     tw.sep("-", "cache values")
+    dummy = object()
     for valpath in sorted(vdir.visit(lambda x: x.isfile())):
         key = valpath.relto(vdir).replace(valpath.sep, "/")
         val = config.cache.get(key, dummy)
         if val is dummy:
-            tw.line("%s contains unreadable content, "
-                    "will be ignored" % key)
+            tw.line(f"{key} contains unreadable content, will be ignored")
         else:
-            tw.line("%s contains:" % key)
+            tw.line(f"{key} contains:")
             stream = py.io.TextIO()
             pprint(val, stream=stream)
             for line in stream.getvalue().splitlines():
-                tw.line("  " + line)
+                tw.line(f"  {line}")
 
     ddir = basedir.join("d")
     if ddir.isdir() and ddir.listdir():

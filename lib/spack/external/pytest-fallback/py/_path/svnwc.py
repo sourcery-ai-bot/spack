@@ -30,7 +30,7 @@ class RepoEntry:
         self.timestamp = timestamp
 
     def __str__(self):
-        return "repo: %s;%s  %s" %(self.url, self.rev, self.timestamp)
+        return f"repo: {self.url};{self.rev}  {self.timestamp}"
 
 class RepoCache:
     """ The Repocache manages discovered repository paths
@@ -64,13 +64,16 @@ class RepoCache:
 
     def get(self, url):
         now = time.time()
-        for entry in self.repos:
-            if url.startswith(entry.url):
-                if now < entry.timestamp + self.timeout:
-                    #print "returning immediate Etrny", entry
-                    return entry.url, entry.rev
-                return entry.url, -1
-        return url, -1
+        return next(
+            (
+                (entry.url, entry.rev)
+                if now < entry.timestamp + self.timeout
+                else (entry.url, -1)
+                for entry in self.repos
+                if url.startswith(entry.url)
+            ),
+            (url, -1),
+        )
 
 repositories = RepoCache()
 
@@ -80,7 +83,7 @@ repositories = RepoCache()
 ALLOWED_CHARS = "_ -/\\=$.~+%" #add characters as necessary when tested
 if sys.platform == "win32":
     ALLOWED_CHARS += ":"
-ALLOWED_CHARS_HOST = ALLOWED_CHARS + '@:'
+ALLOWED_CHARS_HOST = f'{ALLOWED_CHARS}@:'
 
 def _getsvnversion(ver=[]):
     try:
@@ -95,7 +98,7 @@ def _getsvnversion(ver=[]):
 def _escape_helper(text):
     text = str(text)
     if py.std.sys.platform != 'win32':
-        text = str(text).replace('$', '\\$')
+        text = text.replace('$', '\\$')
     return text
 
 def _check_for_bad_chars(text, allowed_chars=ALLOWED_CHARS):
@@ -158,7 +161,7 @@ class SvnPathBase(common.PathBase):
             pb = kw.setdefault('purebasename', purebasename)
             ext = kw.setdefault('ext', ext)
             if ext and not ext.startswith('.'):
-                ext = '.' + ext
+                ext = f'.{ext}'
             kw['basename'] = pb + ext
 
         kw.setdefault('dirname', dirname)
@@ -193,10 +196,7 @@ class SvnPathBase(common.PathBase):
             else:
                 basename = parts[-1]
                 i = basename.rfind('.')
-                if i == -1:
-                    purebasename, ext = basename, ''
-                else:
-                    purebasename, ext = basename[:i], basename[i:]
+                purebasename, ext = (basename, '') if i == -1 else (basename[:i], basename[i:])
                 if name == 'purebasename':
                     res.append(purebasename)
                 elif name == 'ext':
@@ -207,8 +207,7 @@ class SvnPathBase(common.PathBase):
 
     def __eq__(self, other):
         """ return true if path and rev attributes each match """
-        return (str(self) == str(other) and
-               (self.rev == other.rev or self.rev == other.rev))
+        return str(self) == str(other) and self.rev in [other.rev, other.rev]
 
     def __ne__(self, other):
         return not self == other
@@ -220,20 +219,17 @@ class SvnPathBase(common.PathBase):
         if not args:
             return self
 
-        args = tuple([arg.strip(self.sep) for arg in args])
+        args = tuple(arg.strip(self.sep) for arg in args)
         parts = (self.strpath, ) + args
-        newpath = self.__class__(self.sep.join(parts), self.rev, self.auth)
-        return newpath
+        return self.__class__(self.sep.join(parts), self.rev, self.auth)
 
     def propget(self, name):
         """ return the content of the given property. """
-        value = self._propget(name)
-        return value
+        return self._propget(name)
 
     def proplist(self):
         """ list all property names. """
-        content = self._proplist()
-        return content
+        return self._proplist()
 
     def size(self):
         """ Return the size of the file content of the Path. """
@@ -303,7 +299,7 @@ class SvnPathBase(common.PathBase):
 def parse_apr_time(timestr):
     i = timestr.rfind('.')
     if i == -1:
-        raise ValueError("could not parse %s" % timestr)
+        raise ValueError(f"could not parse {timestr}")
     timestr = timestr[:i]
     parsedtime = time.strptime(timestr, "%Y-%m-%dT%H:%M:%S")
     return time.mktime(parsedtime)
@@ -322,9 +318,7 @@ class PropListDict(dict):
         return value
 
 def fixlocale():
-    if sys.platform != 'win32':
-        return 'LC_ALL=C '
-    return ''
+    return 'LC_ALL=C ' if sys.platform != 'win32' else ''
 
 # some nasty chunk of code to solve path and url conversion and quoting issues
 ILLEGAL_CHARS = '* | \\ / : < > ? \t \n \x0b \x0c \r'.split(' ')
@@ -346,10 +340,8 @@ def _check_path(path):
 def path_to_fspath(path, addat=True):
     _check_path(path)
     sp = path.strpath
-    if addat and path.rev != -1:
-        sp = '%s@%s' % (sp, path.rev)
-    elif addat:
-        sp = '%s@HEAD' % (sp,)
+    if addat:
+        sp = f'{sp}@{path.rev}' if path.rev != -1 else f'{sp}@HEAD'
     return sp
 
 def url_from_path(path):
@@ -365,11 +357,8 @@ def url_from_path(path):
             fspath = quote(fspath)
     else:
         fspath = quote(fspath)
-    if path.rev != -1:
-        fspath = '%s@%s' % (fspath, path.rev)
-    else:
-        fspath = '%s@HEAD' % (fspath,)
-    return 'file://%s' % (fspath,)
+    fspath = f'{fspath}@{path.rev}' if path.rev != -1 else f'{fspath}@HEAD'
+    return f'file://{fspath}'
 
 class SvnAuth(object):
     """ container for auth information for Subversion """
@@ -394,7 +383,7 @@ class SvnAuth(object):
         return ' '.join(ret)
 
     def __str__(self):
-        return "<SvnAuth username=%s ...>" %(self.username,)
+        return f"<SvnAuth username={self.username} ...>"
 
 rex_blame = re.compile(r'\s*(\d+)\s*(\S+) (.*)')
 
@@ -413,7 +402,7 @@ class SvnWCCommandPath(common.PathBase):
             wcpath = wcpath.localpath
         if _check_for_bad_chars(str(wcpath),
                                           ALLOWED_CHARS):
-            raise ValueError("bad char in wcpath %s" % (wcpath, ))
+            raise ValueError(f"bad char in wcpath {wcpath}")
         self.localpath = py.path.local(wcpath)
         self.auth = auth
         return self
@@ -452,9 +441,7 @@ class SvnWCCommandPath(common.PathBase):
         return str(self.localpath)
 
     def _makeauthoptions(self):
-        if self.auth is None:
-            return ''
-        return self.auth.makecmdoptions()
+        return '' if self.auth is None else self.auth.makecmdoptions()
 
     def _authsvn(self, cmd, args=None):
         args = args and list(args) or []
@@ -462,7 +449,7 @@ class SvnWCCommandPath(common.PathBase):
         return self._svn(cmd, *args)
 
     def _svn(self, cmd, *args):
-        l = ['svn %s' % cmd]
+        l = [f'svn {cmd}']
         args = [self._escape(item) for item in args]
         l.extend(args)
         l.append('"%s"' % self._escape(self.strpath))
@@ -507,11 +494,10 @@ class SvnWCCommandPath(common.PathBase):
             if (py.std.sys.platform != 'win32' and
                     _getsvnversion() == '1.3'):
                 url += "@HEAD"
+        elif _getsvnversion() == '1.3':
+            url += "@%d" % rev
         else:
-            if _getsvnversion() == '1.3':
-                url += "@%d" % rev
-            else:
-                args.append('-r' + str(rev))
+            args.append(f'-r{str(rev)}')
         args.append(url)
         self._authsvn('co', args)
 
@@ -560,9 +546,8 @@ class SvnWCCommandPath(common.PathBase):
         """ create & return the directory joined with args. """
         if args:
             return self.join(*args).mkdir()
-        else:
-            self._svn('mkdir')
-            return self
+        self._svn('mkdir')
+        return self
 
     def add(self):
         """ add ourself to svn """
@@ -585,11 +570,11 @@ class SvnWCCommandPath(common.PathBase):
 
     def copy(self, target):
         """ copy path to target."""
-        py.process.cmdexec("svn copy %s %s" %(str(self), str(target)))
+        py.process.cmdexec(f"svn copy {str(self)} {str(target)}")
 
     def rename(self, target):
         """ rename this path to target. """
-        py.process.cmdexec("svn move --force %s %s" %(str(self), str(target)))
+        py.process.cmdexec(f"svn move --force {str(self)} {str(target)}")
 
     def lock(self):
         """ set a lock (exclusive) on the resource """
@@ -624,27 +609,17 @@ class SvnWCCommandPath(common.PathBase):
         else:
             #1.2 supports: externals = '--ignore-externals'
             externals = ''
-        if rec:
-            rec= ''
-        else:
-            rec = '--non-recursive'
-
+        rec = '' if rec else '--non-recursive'
         # XXX does not work on all subversion versions
         #if not externals:
         #    externals = '--ignore-externals'
 
-        if updates:
-            updates = '-u'
-        else:
-            updates = ''
-
+        updates = '-u' if updates else ''
         try:
-            cmd = 'status -v --xml --no-ignore %s %s %s' % (
-                    updates, rec, externals)
+            cmd = f'status -v --xml --no-ignore {updates} {rec} {externals}'
             out = self._authsvn(cmd)
         except py.process.cmdexec.Error:
-            cmd = 'status -v --no-ignore %s %s %s' % (
-                    updates, rec, externals)
+            cmd = f'status -v --no-ignore {updates} {rec} {externals}'
             out = self._authsvn(cmd)
             rootstatus = WCStatus(self).fromstring(out, self)
         else:
@@ -658,8 +633,7 @@ class SvnWCCommandPath(common.PathBase):
         args = []
         if rev is not None:
             args.append("-r %d" % rev)
-        out = self._authsvn('diff', args)
-        return out
+        return self._authsvn('diff', args)
 
     def blame(self):
         """ return a list of tuples of three elements:
@@ -731,11 +705,7 @@ If rec is True, then return a dictionary mapping sub-paths to such mappings.
     def revert(self, rec=0):
         """ revert the local changes of this path. if rec is True, do so
 recursively. """
-        if rec:
-            result = self._svn('revert -R')
-        else:
-            result = self._svn('revert')
-        return result
+        return self._svn('revert -R') if rec else self._svn('revert')
 
     def new(self, **kw):
         """ create a modified version of this path. A 'rev' argument
@@ -748,10 +718,7 @@ recursively. """
                                         |--|     purebasename
                                             |--| ext
         """
-        if kw:
-            localpath = self.localpath.new(**kw)
-        else:
-            localpath = self.localpath
+        localpath = self.localpath.new(**kw) if kw else self.localpath
         return self.__class__(localpath, auth=self.auth)
 
     def join(self, *args, **kwargs):
@@ -785,10 +752,12 @@ recursively. """
             info = InfoSvnWCCommand(output)
 
             # Can't reliably compare on Windows without access to win32api
-            if py.std.sys.platform != 'win32':
-                if info.path != self.localpath:
-                    raise py.error.ENOENT(self, "not a versioned resource:" +
-                            " %s != %s" % (info.path, self.localpath))
+            if py.std.sys.platform != 'win32' and info.path != self.localpath:
+                raise py.error.ENOENT(
+                    self,
+                    f"not a versioned resource: {info.path} != {self.localpath}",
+                )
+
             cache.info[self] = info
         return info
 
@@ -845,13 +814,13 @@ rev_end is the last revision (defaulting to HEAD).
 if verbose is True, then the LogEntry instances also know which files changed.
 """
         assert self.check()   # make it simpler for the pipe
-        rev_start = rev_start is None and "HEAD" or rev_start
-        rev_end = rev_end is None and "HEAD" or rev_end
+        rev_start = "HEAD" if rev_start is None else rev_start
+        rev_end = "HEAD" if rev_end is None else rev_end
         if rev_start == "HEAD" and rev_end == 1:
-                rev_opt = ""
+            rev_opt = ""
         else:
-            rev_opt = "-r %s:%s" % (rev_start, rev_end)
-        verbose_opt = verbose and "-v" or ""
+            rev_opt = f"-r {rev_start}:{rev_end}"
+        verbose_opt = "-v" if verbose else ""
         locale_env = fixlocale()
         # some blather on stderr
         auth_opt = self._makeauthoptions()
@@ -874,11 +843,11 @@ if verbose is True, then the LogEntry instances also know which files changed.
             tree = minidom.parseString(stdout)
         except ExpatError:
             raise ValueError('no such revision')
-        result = []
-        for logentry in filter(None, tree.firstChild.childNodes):
-            if logentry.nodeType == logentry.ELEMENT_NODE:
-                result.append(LogEntry(logentry))
-        return result
+        return [
+            LogEntry(logentry)
+            for logentry in filter(None, tree.firstChild.childNodes)
+            if logentry.nodeType == logentry.ELEMENT_NODE
+        ]
 
     def size(self):
         """ Return the size of the file content of the Path. """
@@ -923,12 +892,12 @@ class WCStatus:
     # seem to be a more solid approach :(
     _rex_status = re.compile(r'\s+(\d+|-)\s+(\S+)\s+(.+?)\s{2,}(.*)')
 
-    def fromstring(data, rootwcpath, rev=None, modrev=None, author=None):
+    def fromstring(self, rootwcpath, rev=None, modrev=None, author=None):
         """ return a new WCStatus object from data 's'
         """
         rootstatus = WCStatus(rootwcpath, rev, modrev, author)
         update_rev = None
-        for line in data.split('\n'):
+        for line in self.split('\n'):
             if not line.strip():
                 continue
             #print "processing %r" % line
@@ -943,22 +912,20 @@ class WCStatus:
                 if c0 == '?':
                     wcpath = rootwcpath.join(fn, abs=1)
                     rootstatus.unknown.append(wcpath)
+                elif c0 == 'I':
+                    wcpath = rootwcpath.join(fn, abs=1)
+                    rootstatus.ignored.append(wcpath)
+
                 elif c0 == 'X':
                     wcpath = rootwcpath.__class__(
                         rootwcpath.localpath.join(fn, abs=1),
                         auth=rootwcpath.auth)
                     rootstatus.external.append(wcpath)
-                elif c0 == 'I':
-                    wcpath = rootwcpath.join(fn, abs=1)
-                    rootstatus.ignored.append(wcpath)
-
                 continue
 
-            #elif c0 in '~!' or c4 == 'S':
-            #    raise NotImplementedError("received flag %r" % c0)
-
-            m = WCStatus._rex_status.match(rest)
-            if not m:
+            if m := WCStatus._rex_status.match(rest):
+                rev, modrev, author, fn = m.groups()
+            else:
                 if c7 == '*':
                     fn = rest.strip()
                     wcpath = rootwcpath.join(fn, abs=1)
@@ -976,8 +943,6 @@ class WCStatus:
                     continue
                 # keep trying
                 raise ValueError("could not parse line %r" % line)
-            else:
-                rev, modrev, author, fn = m.groups()
             wcpath = rootwcpath.join(fn, abs=1)
             #assert wcpath.check()
             if c0 == 'M':
@@ -1014,12 +979,11 @@ class WCStatus:
                 rootstatus.author = author
                 if update_rev:
                     rootstatus.update_rev = update_rev
-                continue
         return rootstatus
     fromstring = staticmethod(fromstring)
 
 class XMLWCStatus(WCStatus):
-    def fromstring(data, rootwcpath, rev=None, modrev=None, author=None):
+    def fromstring(self, rootwcpath, rev=None, modrev=None, author=None):
         """ parse 'data' (XML string as outputted by svn st) into a status obj
         """
         # XXX for externals, the path is shown twice: once
@@ -1032,12 +996,11 @@ class XMLWCStatus(WCStatus):
         update_rev = None
         minidom, ExpatError = importxml()
         try:
-            doc = minidom.parseString(data)
+            doc = minidom.parseString(self)
         except ExpatError:
             e = sys.exc_info()[1]
             raise ValueError(str(e))
-        urevels = doc.getElementsByTagName('against')
-        if urevels:
+        if urevels := doc.getElementsByTagName('against'):
             rootstatus.update_rev = urevels[-1].getAttribute('revision')
         for entryel in doc.getElementsByTagName('entry'):
             path = entryel.getAttribute('path')
@@ -1064,27 +1027,24 @@ class XMLWCStatus(WCStatus):
                 continue
 
             rev = statusel.getAttribute('revision')
-            if itemstatus == 'added' or itemstatus == 'none':
+            if itemstatus in ['added', 'none']:
                 rev = '0'
                 modrev = '?'
                 author = '?'
                 date = ''
-            elif itemstatus == "replaced":
-                pass
-            else:
-                #print entryel.toxml()
-                commitel = entryel.getElementsByTagName('commit')[0]
-                if commitel:
+            elif itemstatus != "replaced":
+                if commitel := entryel.getElementsByTagName('commit')[0]:
                     modrev = commitel.getAttribute('revision')
                     author = ''
-                    author_els = commitel.getElementsByTagName('author')
-                    if author_els:
+                    if author_els := commitel.getElementsByTagName('author'):
                         for c in author_els[0].childNodes:
                             author += c.nodeValue
-                    date = ''
-                    for c in commitel.getElementsByTagName('date')[0]\
-                            .childNodes:
-                        date += c.nodeValue
+                    date = ''.join(
+                        c.nodeValue
+                        for c in commitel.getElementsByTagName('date')[
+                            0
+                        ].childNodes
+                    )
 
             wcpath = rootwcpath.join(path, abs=1)
 
@@ -1111,9 +1071,7 @@ class XMLWCStatus(WCStatus):
                 rootstatus.author = author
                 rootstatus.date = date
 
-            # handle repos-status element (remote info)
-            rstatusels = entryel.getElementsByTagName('repos-status')
-            if rstatusels:
+            if rstatusels := entryel.getElementsByTagName('repos-status'):
                 rstatusel = rstatusels[0]
                 ritemstatus = rstatusel.getAttribute('item')
                 if ritemstatus in ('added', 'modified'):
@@ -1152,7 +1110,7 @@ class InfoSvnWCCommand:
         except KeyError:
             raise  ValueError("Not a versioned resource")
             #raise ValueError, "Not a versioned resource %r" % path
-        self.kind = d['nodekind'] == 'directory' and 'dir' or d['nodekind']
+        self.kind = 'dir' if d['nodekind'] == 'directory' else d['nodekind']
         try:
             self.rev = int(d['revision'])
         except KeyError:
@@ -1216,23 +1174,24 @@ class LogEntry:
     def __init__(self, logentry):
         self.rev = int(logentry.getAttribute('revision'))
         for lpart in filter(None, logentry.childNodes):
-            if lpart.nodeType == lpart.ELEMENT_NODE:
-                if lpart.nodeName == 'author':
+            if lpart.nodeName == 'author':
+                if lpart.nodeType == lpart.ELEMENT_NODE:
                     self.author = lpart.firstChild.nodeValue
-                elif lpart.nodeName == 'msg':
-                    if lpart.firstChild:
-                        self.msg = lpart.firstChild.nodeValue
-                    else:
-                        self.msg = ''
-                elif lpart.nodeName == 'date':
+            elif lpart.nodeName == 'date':
+                if lpart.nodeType == lpart.ELEMENT_NODE:
                     #2003-07-29T20:05:11.598637Z
                     timestr = lpart.firstChild.nodeValue
                     self.date = parse_apr_time(timestr)
-                elif lpart.nodeName == 'paths':
-                    self.strpaths = []
-                    for ppart in filter(None, lpart.childNodes):
-                        if ppart.nodeType == ppart.ELEMENT_NODE:
-                            self.strpaths.append(PathEntry(ppart))
+            elif lpart.nodeName == 'msg':
+                if lpart.nodeType == lpart.ELEMENT_NODE:
+                    self.msg = lpart.firstChild.nodeValue if lpart.firstChild else ''
+            elif lpart.nodeName == 'paths':
+                if lpart.nodeType == lpart.ELEMENT_NODE:
+                    self.strpaths = [
+                        PathEntry(ppart)
+                        for ppart in filter(None, lpart.childNodes)
+                        if ppart.nodeType == ppart.ELEMENT_NODE
+                    ]
     def __repr__(self):
         return '<Logentry rev=%d author=%s date=%s>' % (
             self.rev, self.author, self.date)

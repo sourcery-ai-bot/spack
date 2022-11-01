@@ -164,39 +164,37 @@ def get_cpu_subtype(cpu_type, cpu_subtype):
     st = cpu_subtype & 0x0FFFFFFF
 
     if cpu_type == 1:
-        subtype = VAX_SUBTYPE.get(st, st)
+        return VAX_SUBTYPE.get(st, st)
     elif cpu_type == 6:
-        subtype = MC680_SUBTYPE.get(st, st)
+        return MC680_SUBTYPE.get(st, st)
     elif cpu_type == 7:
-        subtype = INTEL_SUBTYPE.get(st, st)
+        return INTEL_SUBTYPE.get(st, st)
     elif cpu_type == 7 | _CPU_ARCH_ABI64:
-        subtype = INTEL64_SUBTYPE.get(st, st)
+        return INTEL64_SUBTYPE.get(st, st)
     elif cpu_type == 8:
-        subtype = MIPS_SUBTYPE.get(st, st)
+        return MIPS_SUBTYPE.get(st, st)
     elif cpu_type == 10:
-        subtype = MC98000_SUBTYPE.get(st, st)
+        return MC98000_SUBTYPE.get(st, st)
     elif cpu_type == 11:
-        subtype = HPPA_SUBTYPE.get(st, st)
+        return HPPA_SUBTYPE.get(st, st)
     elif cpu_type == 12:
-        subtype = ARM_SUBTYPE.get(st, st)
+        return ARM_SUBTYPE.get(st, st)
     elif cpu_type == 12 | _CPU_ARCH_ABI64:
-        subtype = ARM64_SUBTYPE.get(st, st)
+        return ARM64_SUBTYPE.get(st, st)
     elif cpu_type == 13:
-        subtype = MC88_SUBTYPE.get(st, st)
+        return MC88_SUBTYPE.get(st, st)
     elif cpu_type == 14:
-        subtype = SPARC_SUBTYPE.get(st, st)
+        return SPARC_SUBTYPE.get(st, st)
     elif cpu_type == 15:
-        subtype = I860_SUBTYPE.get(st, st)
+        return I860_SUBTYPE.get(st, st)
     elif cpu_type == 16:
-        subtype = MIPS_SUBTYPE.get(st, st)
+        return MIPS_SUBTYPE.get(st, st)
     elif cpu_type == 18:
-        subtype = POWERPC_SUBTYPE.get(st, st)
+        return POWERPC_SUBTYPE.get(st, st)
     elif cpu_type == 18 | _CPU_ARCH_ABI64:
-        subtype = POWERPC_SUBTYPE.get(st, st)
+        return POWERPC_SUBTYPE.get(st, st)
     else:
-        subtype = str(st)
-
-    return subtype
+        return str(st)
 
 
 _MH_EXECUTE_SYM = "__mh_execute_header"
@@ -383,7 +381,7 @@ class mach_version_helper(Structure):
         return (self._version & 0xFFFFFF00) | v
 
     def __str__(self):
-        return "%s.%s.%s" % (self.major, self.minor, self.rev)
+        return f"{self.major}.{self.minor}.{self.rev}"
 
 
 class mach_timestamp_helper(p_uint32):
@@ -532,8 +530,7 @@ class segment_command(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["segname"] = self.segname.rstrip("\x00")
+        s = {"segname": self.segname.rstrip("\x00")}
         s["vmaddr"] = int(self.vmaddr)
         s["vmsize"] = int(self.vmsize)
         s["fileoff"] = int(self.fileoff)
@@ -585,8 +582,7 @@ class segment_command_64(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["segname"] = self.segname.rstrip("\x00")
+        s = {"segname": self.segname.rstrip("\x00")}
         s["vmaddr"] = int(self.vmaddr)
         s["vmsize"] = int(self.vmsize)
         s["fileoff"] = int(self.fileoff)
@@ -646,8 +642,7 @@ class section(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["sectname"] = self.sectname.rstrip("\x00")
+        s = {"sectname": self.sectname.rstrip("\x00")}
         s["segname"] = self.segname.rstrip("\x00")
         s["addr"] = int(self.addr)
         s["size"] = int(self.size)
@@ -655,9 +650,7 @@ class section(Structure):
         s["align"] = int(self.align)
         s["reloff"] = int(self.reloff)
         s["nreloc"] = int(self.nreloc)
-        f = {}
-        f["type"] = FLAG_SECTION_TYPES[int(self.flags) & 0xFF]
-        f["attributes"] = []
+        f = {"type": FLAG_SECTION_TYPES[int(self.flags) & 0xFF], "attributes": []}
         for k in FLAG_SECTION_ATTRIBUTES:
             if k & self.flags:
                 f["attributes"].append(FLAG_SECTION_ATTRIBUTES[k])
@@ -689,8 +682,7 @@ class section_64(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["sectname"] = self.sectname.rstrip("\x00")
+        s = {"sectname": self.sectname.rstrip("\x00")}
         s["segname"] = self.segname.rstrip("\x00")
         s["addr"] = int(self.addr)
         s["size"] = int(self.size)
@@ -698,9 +690,7 @@ class section_64(Structure):
         s["align"] = int(self.align)
         s["reloff"] = int(self.reloff)
         s["nreloc"] = int(self.nreloc)
-        f = {}
-        f["type"] = FLAG_SECTION_TYPES[int(self.flags) & 0xFF]
-        f["attributes"] = []
+        f = {"type": FLAG_SECTION_TYPES[int(self.flags) & 0xFF], "attributes": []}
         for k in FLAG_SECTION_ATTRIBUTES:
             if k & self.flags:
                 f["attributes"].append(FLAG_SECTION_ATTRIBUTES[k])
@@ -833,9 +823,7 @@ class fvmlib_command(Structure):
     _fields_ = fvmlib._fields_
 
     def describe(self):
-        s = {}
-        s["header_addr"] = int(self.header_addr)
-        return s
+        return {"header_addr": int(self.header_addr)}
 
 
 class dylib(Structure):
@@ -852,11 +840,11 @@ class dylib_command(Structure):
     _fields_ = dylib._fields_
 
     def describe(self):
-        s = {}
-        s["timestamp"] = str(self.timestamp)
-        s["current_version"] = str(self.current_version)
-        s["compatibility_version"] = str(self.compatibility_version)
-        return s
+        return {
+            "timestamp": str(self.timestamp),
+            "current_version": str(self.current_version),
+            "compatibility_version": str(self.compatibility_version),
+        }
 
 
 class sub_framework_command(Structure):
@@ -905,20 +893,14 @@ class thread_command(Structure):
     _fields_ = (("flavor", p_uint32), ("count", p_uint32))
 
     def describe(self):
-        s = {}
-        s["flavor"] = int(self.flavor)
-        s["count"] = int(self.count)
-        return s
+        return {"flavor": int(self.flavor), "count": int(self.count)}
 
 
 class entry_point_command(Structure):
     _fields_ = (("entryoff", p_uint64), ("stacksize", p_uint64))
 
     def describe(self):
-        s = {}
-        s["entryoff"] = int(self.entryoff)
-        s["stacksize"] = int(self.stacksize)
-        return s
+        return {"entryoff": int(self.entryoff), "stacksize": int(self.stacksize)}
 
 
 class routines_command(Structure):
@@ -934,16 +916,16 @@ class routines_command(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["init_address"] = int(self.init_address)
-        s["init_module"] = int(self.init_module)
-        s["reserved1"] = int(self.reserved1)
-        s["reserved2"] = int(self.reserved2)
-        s["reserved3"] = int(self.reserved3)
-        s["reserved4"] = int(self.reserved4)
-        s["reserved5"] = int(self.reserved5)
-        s["reserved6"] = int(self.reserved6)
-        return s
+        return {
+            "init_address": int(self.init_address),
+            "init_module": int(self.init_module),
+            "reserved1": int(self.reserved1),
+            "reserved2": int(self.reserved2),
+            "reserved3": int(self.reserved3),
+            "reserved4": int(self.reserved4),
+            "reserved5": int(self.reserved5),
+            "reserved6": int(self.reserved6),
+        }
 
 
 class routines_command_64(Structure):
@@ -959,16 +941,16 @@ class routines_command_64(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["init_address"] = int(self.init_address)
-        s["init_module"] = int(self.init_module)
-        s["reserved1"] = int(self.reserved1)
-        s["reserved2"] = int(self.reserved2)
-        s["reserved3"] = int(self.reserved3)
-        s["reserved4"] = int(self.reserved4)
-        s["reserved5"] = int(self.reserved5)
-        s["reserved6"] = int(self.reserved6)
-        return s
+        return {
+            "init_address": int(self.init_address),
+            "init_module": int(self.init_module),
+            "reserved1": int(self.reserved1),
+            "reserved2": int(self.reserved2),
+            "reserved3": int(self.reserved3),
+            "reserved4": int(self.reserved4),
+            "reserved5": int(self.reserved5),
+            "reserved6": int(self.reserved6),
+        }
 
 
 class symtab_command(Structure):
@@ -980,12 +962,12 @@ class symtab_command(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["symoff"] = int(self.symoff)
-        s["nsyms"] = int(self.nsyms)
-        s["stroff"] = int(self.stroff)
-        s["strsize"] = int(self.strsize)
-        return s
+        return {
+            "symoff": int(self.symoff),
+            "nsyms": int(self.nsyms),
+            "stroff": int(self.stroff),
+            "strsize": int(self.strsize),
+        }
 
 
 class dysymtab_command(Structure):
@@ -1011,26 +993,26 @@ class dysymtab_command(Structure):
     )
 
     def describe(self):
-        dys = {}
-        dys["ilocalsym"] = int(self.ilocalsym)
-        dys["nlocalsym"] = int(self.nlocalsym)
-        dys["iextdefsym"] = int(self.iextdefsym)
-        dys["nextdefsym"] = int(self.nextdefsym)
-        dys["iundefsym"] = int(self.iundefsym)
-        dys["nundefsym"] = int(self.nundefsym)
-        dys["tocoff"] = int(self.tocoff)
-        dys["ntoc"] = int(self.ntoc)
-        dys["modtaboff"] = int(self.modtaboff)
-        dys["nmodtab"] = int(self.nmodtab)
-        dys["extrefsymoff"] = int(self.extrefsymoff)
-        dys["nextrefsyms"] = int(self.nextrefsyms)
-        dys["indirectsymoff"] = int(self.indirectsymoff)
-        dys["nindirectsyms"] = int(self.nindirectsyms)
-        dys["extreloff"] = int(self.extreloff)
-        dys["nextrel"] = int(self.nextrel)
-        dys["locreloff"] = int(self.locreloff)
-        dys["nlocrel"] = int(self.nlocrel)
-        return dys
+        return {
+            "ilocalsym": int(self.ilocalsym),
+            "nlocalsym": int(self.nlocalsym),
+            "iextdefsym": int(self.iextdefsym),
+            "nextdefsym": int(self.nextdefsym),
+            "iundefsym": int(self.iundefsym),
+            "nundefsym": int(self.nundefsym),
+            "tocoff": int(self.tocoff),
+            "ntoc": int(self.ntoc),
+            "modtaboff": int(self.modtaboff),
+            "nmodtab": int(self.nmodtab),
+            "extrefsymoff": int(self.extrefsymoff),
+            "nextrefsyms": int(self.nextrefsyms),
+            "indirectsymoff": int(self.indirectsymoff),
+            "nindirectsyms": int(self.nindirectsyms),
+            "extreloff": int(self.extreloff),
+            "nextrel": int(self.nextrel),
+            "locreloff": int(self.locreloff),
+            "nlocrel": int(self.nlocrel),
+        }
 
 
 INDIRECT_SYMBOL_LOCAL = 0x80000000
@@ -1089,10 +1071,7 @@ class twolevel_hints_command(Structure):
     _fields_ = (("offset", p_uint32), ("nhints", p_uint32))
 
     def describe(self):
-        s = {}
-        s["offset"] = int(self.offset)
-        s["nhints"] = int(self.nhints)
-        return s
+        return {"offset": int(self.offset), "nhints": int(self.nhints)}
 
 
 class twolevel_hint(Structure):
@@ -1114,9 +1093,7 @@ class symseg_command(Structure):
     _fields_ = (("offset", p_uint32), ("size", p_uint32))
 
     def describe(self):
-        s = {}
-        s["offset"] = int(self.offset)
-        s["size"] = int(self.size)
+        s = {"offset": int(self.offset), "size": int(self.size)}
 
 
 class ident_command(Structure):
@@ -1151,10 +1128,7 @@ class linkedit_data_command(Structure):
     _fields_ = (("dataoff", p_uint32), ("datasize", p_uint32))
 
     def describe(self):
-        s = {}
-        s["dataoff"] = int(self.dataoff)
-        s["datasize"] = int(self.datasize)
-        return s
+        return {"dataoff": int(self.dataoff), "datasize": int(self.datasize)}
 
 
 class version_min_command(Structure):
@@ -1166,19 +1140,19 @@ class version_min_command(Structure):
     def describe(self):
         v = int(self.version)
         v3 = v & 0xFF
-        v = v >> 8
+        v >>= 8
         v2 = v & 0xFF
-        v = v >> 8
+        v >>= 8
         v1 = v & 0xFFFF
         s = int(self.sdk)
         s3 = s & 0xFF
-        s = s >> 8
+        s >>= 8
         s2 = s & 0xFF
-        s = s >> 8
+        s >>= 8
         s1 = s & 0xFFFF
         return {
-            "version": str(int(v1)) + "." + str(int(v2)) + "." + str(int(v3)),
-            "sdk": str(int(s1)) + "." + str(int(s2)) + "." + str(int(s3)),
+            "version": f"{int(v1)}.{int(v2)}.{int(v3)}",
+            "sdk": f"{int(s1)}.{int(s2)}.{int(s3)}",
         }
 
 
@@ -1192,7 +1166,7 @@ class source_version_command(Structure):
         c = (v >> 20) & 0x3FF
         d = (v >> 10) & 0x3FF
         e = v & 0x3FF
-        r = str(a) + "." + str(b) + "." + str(c) + "." + str(d) + "." + str(e)
+        r = f"{str(a)}.{str(b)}.{str(c)}.{str(d)}.{str(e)}"
         return {"version": r}
 
 
@@ -1253,11 +1227,11 @@ class encryption_info_command(Structure):
     _fields_ = (("cryptoff", p_uint32), ("cryptsize", p_uint32), ("cryptid", p_uint32))
 
     def describe(self):
-        s = {}
-        s["cryptoff"] = int(self.cryptoff)
-        s["cryptsize"] = int(self.cryptsize)
-        s["cryptid"] = int(self.cryptid)
-        return s
+        return {
+            "cryptoff": int(self.cryptoff),
+            "cryptsize": int(self.cryptsize),
+            "cryptid": int(self.cryptid),
+        }
 
 
 class encryption_info_command_64(Structure):
@@ -1269,12 +1243,12 @@ class encryption_info_command_64(Structure):
     )
 
     def describe(self):
-        s = {}
-        s["cryptoff"] = int(self.cryptoff)
-        s["cryptsize"] = int(self.cryptsize)
-        s["cryptid"] = int(self.cryptid)
-        s["pad"] = int(self.pad)
-        return s
+        return {
+            "cryptoff": int(self.cryptoff),
+            "cryptsize": int(self.cryptsize),
+            "cryptid": int(self.cryptid),
+            "pad": int(self.pad),
+        }
 
 
 class dyld_info_command(Structure):
@@ -1292,18 +1266,18 @@ class dyld_info_command(Structure):
     )
 
     def describe(self):
-        dyld = {}
-        dyld["rebase_off"] = int(self.rebase_off)
-        dyld["rebase_size"] = int(self.rebase_size)
-        dyld["bind_off"] = int(self.bind_off)
-        dyld["bind_size"] = int(self.bind_size)
-        dyld["weak_bind_off"] = int(self.weak_bind_off)
-        dyld["weak_bind_size"] = int(self.weak_bind_size)
-        dyld["lazy_bind_off"] = int(self.lazy_bind_off)
-        dyld["lazy_bind_size"] = int(self.lazy_bind_size)
-        dyld["export_off"] = int(self.export_off)
-        dyld["export_size"] = int(self.export_size)
-        return dyld
+        return {
+            "rebase_off": int(self.rebase_off),
+            "rebase_size": int(self.rebase_size),
+            "bind_off": int(self.bind_off),
+            "bind_size": int(self.bind_size),
+            "weak_bind_off": int(self.weak_bind_off),
+            "weak_bind_size": int(self.weak_bind_size),
+            "lazy_bind_off": int(self.lazy_bind_off),
+            "lazy_bind_size": int(self.lazy_bind_size),
+            "export_off": int(self.export_off),
+            "export_size": int(self.export_size),
+        }
 
 
 class linker_option_command(Structure):

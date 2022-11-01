@@ -59,18 +59,18 @@ class MetaPackable(type):
     initializer
     """
 
-    def from_mmap(cls, mm, ptr, **kw):
-        return cls.from_str(mm[ptr : ptr + cls._size_], **kw)  # noqa: E203
+    def from_mmap(self, mm, ptr, **kw):
+        return self.from_str(mm[ptr:ptr + self._size_], **kw)
 
-    def from_fileobj(cls, f, **kw):
-        return cls.from_str(f.read(cls._size_), **kw)
+    def from_fileobj(self, f, **kw):
+        return self.from_str(f.read(self._size_), **kw)
 
-    def from_str(cls, s, **kw):
-        endian = kw.get("_endian_", cls._endian_)
-        return cls.from_tuple(struct.unpack(endian + cls._format_, s), **kw)
+    def from_str(self, s, **kw):
+        endian = kw.get("_endian_", self._endian_)
+        return self.from_tuple(struct.unpack(endian + self._format_, s), **kw)
 
-    def from_tuple(cls, tpl, **kw):
-        return cls(tpl[0], **kw)
+    def from_tuple(self, tpl, **kw):
+        return self(tpl[0], **kw)
 
 
 class BasePackable(object):
@@ -111,11 +111,7 @@ def pypackable(name, pytype, format):
     size, items = _formatinfo(format)
 
     def __new__(cls, *args, **kwds):
-        if "_endian_" in kwds:
-            _endian_ = kwds.pop("_endian_")
-        else:
-            _endian_ = cls._endian_
-
+        _endian_ = kwds.pop("_endian_") if "_endian_" in kwds else cls._endian_
         result = pytype.__new__(cls, *args, **kwds)
         result._endian_ = _endian_
         return result
@@ -182,16 +178,16 @@ class MetaStructure(MetaPackable):
         dct["_format_"] = format
         return super(MetaStructure, cls).__new__(cls, clsname, bases, dct)
 
-    def from_tuple(cls, tpl, **kw):
+    def from_tuple(self, tpl, **kw):
         values = []
         current = 0
-        for begin, length, typ in cls._structmarks_:
+        for begin, length, typ in self._structmarks_:
             if begin > current:
                 values.extend(tpl[current:begin])
             current = begin + length
             values.append(typ.from_tuple(tpl[begin:current], **kw))
         values.extend(tpl[current:])
-        return cls(*values, **kw)
+        return self(*values, **kw)
 
 
 # See metaclass discussion earlier in this file
@@ -221,9 +217,7 @@ def _make():
     def _get_packables(self):
         for obj in imap(self._objects_.__getitem__, self._names_):
             if hasattr(obj, "_get_packables"):
-                for obj in obj._get_packables():
-                    yield obj
-
+                yield from obj._get_packables()
             else:
                 yield obj
 

@@ -112,9 +112,7 @@ def dupfile(f, mode=None, buffering=0, raising=False, encoding=None):
         return os.fdopen(newfd, mode, buffering, encoding, closefd=True)
     else:
         f = os.fdopen(newfd, mode, buffering)
-        if encoding is not None:
-            return EncodedFile(f, encoding)
-        return f
+        return EncodedFile(f, encoding) if encoding is not None else f
 
 class EncodedFile(object):
     def __init__(self, _stream, encoding):
@@ -124,9 +122,7 @@ class EncodedFile(object):
     def write(self, obj):
         if isinstance(obj, unicode):
             obj = obj.encode(self.encoding)
-        elif isinstance(obj, str):
-            pass
-        else:
+        elif not isinstance(obj, str):
             obj = str(obj)
         self._stream.write(obj)
 
@@ -138,14 +134,14 @@ class EncodedFile(object):
         return getattr(self._stream, name)
 
 class Capture(object):
-    def call(cls, func, *args, **kwargs):
+    def call(self, func, *args, **kwargs):
         """ return a (res, out, err) tuple where
             out and err represent the output/error output
             during function execution.
             call the given function with args/kwargs
             and capture output/error during its execution.
         """
-        so = cls()
+        so = self()
         try:
             res = func(*args, **kwargs)
         finally:
@@ -258,21 +254,14 @@ class StdCaptureFD(Capture):
 
     def readouterr(self):
         """ return snapshot value of stdout/stderr capturings. """
-        if hasattr(self, "out"):
-            out = self._readsnapshot(self.out.tmpfile)
-        else:
-            out = ""
-        if hasattr(self, "err"):
-            err = self._readsnapshot(self.err.tmpfile)
-        else:
-            err = ""
+        out = self._readsnapshot(self.out.tmpfile) if hasattr(self, "out") else ""
+        err = self._readsnapshot(self.err.tmpfile) if hasattr(self, "err") else ""
         return [out, err]
 
     def _readsnapshot(self, f):
         f.seek(0)
         res = f.read()
-        enc = getattr(f, "encoding", None)
-        if enc:
+        if enc := getattr(f, "encoding", None):
             res = py.builtin._totext(res, enc, "replace")
         f.truncate(0)
         f.seek(0)
@@ -365,7 +354,4 @@ class DontReadFromInput:
 try:
     devnullpath = os.devnull
 except AttributeError:
-    if os.name == 'nt':
-        devnullpath = 'NUL'
-    else:
-        devnullpath = '/dev/null'
+    devnullpath = 'NUL' if os.name == 'nt' else '/dev/null'

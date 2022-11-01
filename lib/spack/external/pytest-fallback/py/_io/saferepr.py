@@ -21,12 +21,13 @@ class SafeRepr(reprlib.Repr):
                 return py.builtin._totext('"%s"') % u
             else:
                 return py.builtin._totext("'%s'") % u.replace("'", r"\'")
+
         s = repr(x[:self.maxstring])
         if len(s) > self.maxstring:
             i = max(0, (self.maxstring-3)//2)
             j = max(0, self.maxstring-3-i)
             s = repr(x[:i] + x[len(x)-j:])
-            s = s[:i] + '...' + s[len(s)-j:]
+            s = f'{s[:i]}...{s[len(s) - j:]}'
         return s
 
     def repr_instance(self, x, level):
@@ -53,7 +54,7 @@ class SafeRepr(reprlib.Repr):
             if len(s) > self.maxsize:
                 i = max(0, (self.maxsize-3)//2)
                 j = max(0, self.maxsize-3-i)
-                s = s[:i] + '...' + s[len(s)-j:]
+                s = f'{s[:i]}...{s[len(s) - j:]}'
             return s
 
 def saferepr(obj, maxsize=240):

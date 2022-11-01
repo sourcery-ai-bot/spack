@@ -55,8 +55,9 @@ def _show_fixture_action(fixturedef, msg):
         fixture=fixturedef.argname))
 
     if msg == 'SETUP':
-        deps = sorted(arg for arg in fixturedef.argnames if arg != 'request')
-        if deps:
+        if deps := sorted(
+            arg for arg in fixturedef.argnames if arg != 'request'
+        ):
             tw.write(' (fixtures used: {0})'.format(', '.join(deps)))
 
     if hasattr(fixturedef, 'cached_param'):

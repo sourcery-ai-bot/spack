@@ -198,9 +198,11 @@ class OrderedDict(dict):
     @_recursive_repr()
     def __repr__(self):
         'od.__repr__() <==> repr(od)'
-        if not self:
-            return '%s()' % (self.__class__.__name__,)
-        return '%s(%r)' % (self.__class__.__name__, list(self.items()))
+        return (
+            '%s(%r)' % (self.__class__.__name__, list(self.items()))
+            if self
+            else f'{self.__class__.__name__}()'
+        )
 
     def __reduce__(self):
         'Return state information for pickling'
@@ -234,7 +236,7 @@ class OrderedDict(dict):
         '''
         if isinstance(other, OrderedDict):
             return len(self)==len(other) and \
-                   all(p==q for p, q in zip(self.items(), other.items()))
+                       all(p==q for p, q in zip(self.items(), other.items()))
         return dict.__eq__(self, other)
 
 # update_wrapper() and wraps() are tools to help write
@@ -287,19 +289,31 @@ def wraps(wrapped,
 def total_ordering(cls):
     """Class decorator that fills in missing ordering methods"""
     convert = {
-        '__lt__': [('__gt__', lambda self, other: not (self < other or self == other)),
-                   ('__le__', lambda self, other: self < other or self == other),
-                   ('__ge__', lambda self, other: not self < other)],
-        '__le__': [('__ge__', lambda self, other: not self <= other or self == other),
-                   ('__lt__', lambda self, other: self <= other and not self == other),
-                   ('__gt__', lambda self, other: not self <= other)],
-        '__gt__': [('__lt__', lambda self, other: not (self > other or self == other)),
-                   ('__ge__', lambda self, other: self > other or self == other),
-                   ('__le__', lambda self, other: not self > other)],
-        '__ge__': [('__le__', lambda self, other: (not self >= other) or self == other),
-                   ('__gt__', lambda self, other: self >= other and not self == other),
-                   ('__lt__', lambda self, other: not self >= other)]
+        '__lt__': [
+            ('__gt__', lambda self, other: self >= other and self != other),
+            ('__le__', lambda self, other: self < other or self == other),
+            ('__ge__', lambda self, other: not self < other),
+        ],
+        '__le__': [
+            ('__ge__', lambda self, other: not self <= other or self == other),
+            ('__lt__', lambda self, other: self <= other and self != other),
+            ('__gt__', lambda self, other: not self <= other),
+        ],
+        '__gt__': [
+            ('__lt__', lambda self, other: self <= other and self != other),
+            ('__ge__', lambda self, other: self > other or self == other),
+            ('__le__', lambda self, other: not self > other),
+        ],
+        '__ge__': [
+            (
+                '__le__',
+                lambda self, other: (not self >= other) or self == other,
+            ),
+            ('__gt__', lambda self, other: self >= other and self != other),
+            ('__lt__', lambda self, other: not self >= other),
+        ],
     }
+
     roots = set(dir(cls)) & set(convert)
     if not roots:
         raise ValueError('must define at least one ordering operation: < > <= >=')
@@ -355,14 +369,14 @@ def lru_cache(maxsize=100):
     # to allow the implementation to change (including a possible C version).
 
     def decorating_function(user_function,
-                tuple=tuple, sorted=sorted, len=len, KeyError=KeyError):
+                    tuple=tuple, sorted=sorted, len=len, KeyError=KeyError):
 
         hits, misses = [0], [0]
         kwd_mark = (object(),)          # separates positional and keyword args
         lock = Lock()                   # needed because OrderedDict isn't threadsafe
 
         if maxsize is None:
-            cache = dict()              # simple cache without ordering or size limit
+            cache = {}
 
             @wraps(user_function)
             def wrapper(*args, **kwds):
@@ -379,6 +393,7 @@ def lru_cache(maxsize=100):
                 cache[key] = result
                 misses[0] += 1
                 return result
+
         else:
             cache = OrderedDict()           # ordered least recent to most recent
             cache_popitem = cache.popitem

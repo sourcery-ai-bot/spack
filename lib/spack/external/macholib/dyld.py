@@ -61,9 +61,7 @@ _DEFAULT_LIBRARY_FALLBACK = [
 if sys.version_info[0] == 2:
 
     def _ensure_utf8(s):
-        if isinstance(s, unicode):  # noqa: F821
-            return s.encode("utf8")
-        return s
+        return s.encode("utf8") if isinstance(s, unicode) else s
 
 
 else:
@@ -78,9 +76,7 @@ def _dyld_env(env, var):
     if env is None:
         env = os.environ
     rval = env.get(var)
-    if rval is None or rval == "":
-        return []
-    return rval.split(":")
+    return [] if rval is None or rval == "" else rval.split(":")
 
 
 def dyld_image_suffix(env=None):
@@ -164,9 +160,7 @@ def dyld_default_search(name, env=None):
     framework = framework_info(name)
 
     if framework is not None:
-        fallback_framework_path = dyld_fallback_framework_path(env)
-
-        if fallback_framework_path:
+        if fallback_framework_path := dyld_fallback_framework_path(env):
             for path in fallback_framework_path:
                 yield os.path.join(path, framework["name"])
 
@@ -174,8 +168,7 @@ def dyld_default_search(name, env=None):
             for path in _DEFAULT_FRAMEWORK_FALLBACK:
                 yield os.path.join(path, framework["name"])
 
-    fallback_library_path = dyld_fallback_library_path(env)
-    if fallback_library_path:
+    if fallback_library_path := dyld_fallback_library_path(env):
         for path in fallback_library_path:
             yield os.path.join(path, os.path.basename(name))
 
@@ -206,7 +199,7 @@ def dyld_find(name, executable_path=None, env=None, loader_path=None):
             return path
         if os.path.isfile(path):
             return path
-    raise ValueError("dylib %s could not be found" % (name,))
+    raise ValueError(f"dylib {name} could not be found")
 
 
 def framework_find(fn, executable_path=None, env=None):

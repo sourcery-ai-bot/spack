@@ -85,10 +85,7 @@ else:
     import cStringIO
     BytesIO = cStringIO.StringIO
 
-if PY3:
-    builtins_module = 'builtins'
-else:
-    builtins_module = '__builtin__'
+builtins_module = 'builtins' if PY3 else '__builtin__'
 
 
 def with_metaclass(meta, *bases):
@@ -109,13 +106,8 @@ def dbg(val=None):
     if _debug is None:
         # set to true or false
         _debug = os.environ.get('YAMLDEBUG')
-        if _debug is None:
-            _debug = 0
-        else:
-            _debug = int(_debug)
-    if val is None:
-        return _debug
-    return _debug & val
+        _debug = 0 if _debug is None else int(_debug)
+    return _debug if val is None else _debug & val
 
 
 def nprint(*args, **kw):

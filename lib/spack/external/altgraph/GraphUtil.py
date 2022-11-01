@@ -17,11 +17,7 @@ def generate_random_graph(node_num, edge_num, self_loops=False, multi_edges=Fals
     g = Graph.Graph()
 
     if not multi_edges:
-        if self_loops:
-            max_edges = node_num * node_num
-        else:
-            max_edges = node_num * (node_num - 1)
-
+        max_edges = node_num * node_num if self_loops else node_num * (node_num - 1)
         if edge_num > max_edges:
             raise GraphError("inconsistent arguments to 'generate_random_graph'")
 
@@ -66,8 +62,7 @@ def generate_scale_free_graph(steps, growth_num, self_loops=False, multi_edges=F
     store = []
     for i in range(growth_num):
         for j in range(i + 1, growth_num):
-            store.append(i)
-            store.append(j)
+            store.extend((i, j))
             graph.add_edge(i, j)
 
     # generate
@@ -87,9 +82,7 @@ def generate_scale_free_graph(steps, growth_num, self_loops=False, multi_edges=F
             graph.add_edge(node, nbr)
 
         for nbr in graph.out_nbrs(node):
-            store.append(node)
-            store.append(nbr)
-
+            store.extend((node, nbr))
     return graph
 
 

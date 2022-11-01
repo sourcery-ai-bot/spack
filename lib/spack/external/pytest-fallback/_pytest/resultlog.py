@@ -30,8 +30,7 @@ def pytest_configure(config):
 
 
 def pytest_unconfigure(config):
-    resultlog = getattr(config, '_resultlog', None)
-    if resultlog:
+    if resultlog := getattr(config, '_resultlog', None):
         resultlog.logfile.close()
         del config._resultlog
         config.pluginmanager.unregister(resultlog)
@@ -67,9 +66,9 @@ class ResultLog(object):
         self.logfile = logfile  # preferably line buffered
 
     def write_log_entry(self, testpath, lettercode, longrepr):
-        print("%s %s" % (lettercode, testpath), file=self.logfile)
+        print(f"{lettercode} {testpath}", file=self.logfile)
         for line in longrepr.splitlines():
-            print(" %s" % line, file=self.logfile)
+            print(f" {line}", file=self.logfile)
 
     def log_outcome(self, report, lettercode, longrepr):
         testpath = getattr(report, 'nodeid', None)
@@ -82,14 +81,12 @@ class ResultLog(object):
             return
         res = self.config.hook.pytest_report_teststatus(report=report)
         code = res[1]
-        if code == 'x':
+        if code == 'x' or code != 'X' and not report.passed and report.failed:
             longrepr = str(report.longrepr)
         elif code == 'X':
             longrepr = ''
         elif report.passed:
             longrepr = ""
-        elif report.failed:
-            longrepr = str(report.longrepr)
         elif report.skipped:
             longrepr = str(report.longrepr[2])
         self.log_outcome(report, code, longrepr)
@@ -109,5 +106,5 @@ class ResultLog(object):
         reprcrash = getattr(excrepr, 'reprcrash', None)
         path = getattr(reprcrash, "path", None)
         if path is None:
-            path = "cwd:%s" % py.path.local()
+            path = f"cwd:{py.path.local()}"
         self.write_log_entry(path, '!', str(excrepr))

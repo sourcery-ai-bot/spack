@@ -78,10 +78,7 @@ def _format_lines(lines):
     stackcnt = [0]
     for line in lines[1:]:
         if line.startswith('{'):
-            if stackcnt[-1]:
-                s = u('and   ')
-            else:
-                s = u('where ')
+            s = u('and   ') if stackcnt[-1] else u('where ')
             stack.append(len(result))
             stackcnt[-1] += 1
             stackcnt.append(0)
@@ -161,10 +158,7 @@ def assertrepr_compare(config, op, left, right):
               'Probably an object has a faulty __repr__.)'),
             u(_pytest._code.ExceptionInfo())]
 
-    if not explanation:
-        return None
-
-    return [summary] + explanation
+    return [summary] + explanation if explanation else None
 
 
 def _diff_text(left, right, verbose=False):
@@ -253,41 +247,42 @@ def _compare_eq_set(left, right, verbose=False):
     diff_right = right - left
     if diff_left:
         explanation.append(u('Extra items in the left set:'))
-        for item in diff_left:
-            explanation.append(py.io.saferepr(item))
+        explanation.extend(py.io.saferepr(item) for item in diff_left)
     if diff_right:
         explanation.append(u('Extra items in the right set:'))
-        for item in diff_right:
-            explanation.append(py.io.saferepr(item))
+        explanation.extend(py.io.saferepr(item) for item in diff_right)
     return explanation
 
 
 def _compare_eq_dict(left, right, verbose=False):
     explanation = []
     common = set(left).intersection(set(right))
-    same = dict((k, left[k]) for k in common if left[k] == right[k])
-    if same and verbose < 2:
-        explanation += [u('Omitting %s identical items, use -vv to show') %
-                        len(same)]
-    elif same:
-        explanation += [u('Common items:')]
-        explanation += pprint.pformat(same).splitlines()
-    diff = set(k for k in common if left[k] != right[k])
-    if diff:
+    if same := {k: left[k] for k in common if left[k] == right[k]}:
+        if verbose < 2:
+            explanation += [u('Omitting %s identical items, use -vv to show') %
+                            len(same)]
+        else:
+            explanation += [u('Common items:')]
+            explanation += pprint.pformat(same).splitlines()
+    if diff := {k for k in common if left[k] != right[k]}:
         explanation += [u('Differing items:')]
         for k in diff:
-            explanation += [py.io.saferepr({k: left[k]}) + ' != ' +
-                            py.io.saferepr({k: right[k]})]
-    extra_left = set(left) - set(right)
-    if extra_left:
+            explanation += [
+                f'{py.io.saferepr({k: left[k]})} != {py.io.saferepr({k: right[k]})}'
+            ]
+
+    if extra_left := set(left) - set(right):
         explanation.append(u('Left contains more items:'))
-        explanation.extend(pprint.pformat(
-            dict((k, left[k]) for k in extra_left)).splitlines())
-    extra_right = set(right) - set(left)
-    if extra_right:
+        explanation.extend(
+            pprint.pformat({k: left[k] for k in extra_left}).splitlines()
+        )
+
+    if extra_right := set(right) - set(left):
         explanation.append(u('Right contains more items:'))
-        explanation.extend(pprint.pformat(
-            dict((k, right[k]) for k in extra_right)).splitlines())
+        explanation.extend(
+            pprint.pformat({k: right[k] for k in extra_right}).splitlines()
+        )
+
     return explanation
 
 

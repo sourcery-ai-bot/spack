@@ -99,16 +99,17 @@ class Microarchitecture(object):
 
     @coerce_target_names
     def __eq__(self, other):
-        if not isinstance(other, Microarchitecture):
-            return NotImplemented
-
         return (
-            self.name == other.name
-            and self.vendor == other.vendor
-            and self.features == other.features
-            and self.parents == other.parents  # avoid ancestors here
-            and self.compilers == other.compilers
-            and self.generation == other.generation
+            (
+                self.name == other.name
+                and self.vendor == other.vendor
+                and self.features == other.features
+                and self.parents == other.parents  # avoid ancestors here
+                and self.compilers == other.compilers
+                and self.generation == other.generation
+            )
+            if isinstance(other, Microarchitecture)
+            else NotImplemented
         )
 
     @coerce_target_names
@@ -117,10 +118,11 @@ class Microarchitecture(object):
 
     @coerce_target_names
     def __lt__(self, other):
-        if not isinstance(other, Microarchitecture):
-            return NotImplemented
-
-        return self._to_set() < other._to_set()
+        return (
+            self._to_set() < other._to_set()
+            if isinstance(other, Microarchitecture)
+            else NotImplemented
+        )
 
     @coerce_target_names
     def __le__(self, other):
@@ -128,10 +130,11 @@ class Microarchitecture(object):
 
     @coerce_target_names
     def __gt__(self, other):
-        if not isinstance(other, Microarchitecture):
-            return NotImplemented
-
-        return self._to_set() > other._to_set()
+        return (
+            self._to_set() > other._to_set()
+            if isinstance(other, Microarchitecture)
+            else NotImplemented
+        )
 
     @coerce_target_names
     def __ge__(self, other):
@@ -167,8 +170,11 @@ class Microarchitecture(object):
     def family(self):
         """Returns the architecture family a given target belongs to"""
         roots = [x for x in [self] + self.ancestors if not x.ancestors]
-        msg = "a target is expected to belong to just one architecture family"
-        msg += "[found {0}]".format(", ".join(str(x) for x in roots))
+        msg = (
+            "a target is expected to belong to just one architecture family"
+            + "[found {0}]".format(", ".join(str(x) for x in roots))
+        )
+
         assert len(roots) == 1, msg
 
         return roots.pop()
@@ -193,10 +199,7 @@ class Microarchitecture(object):
             ("generation", self.generation),
             ("parents", [str(x) for x in self.parents]),
         ]
-        if return_list_of_items:
-            return list_of_items
-
-        return dict(list_of_items)
+        return list_of_items if return_list_of_items else dict(list_of_items)
 
     def optimization_flags(self, compiler, version):
         """Returns a string containing the optimization flags that needs
@@ -305,13 +308,7 @@ def version_components(version):
         version (str): version to be decomposed into its components
     """
     match = re.match(r"([\d.]*)(-?)(.*)", str(version))
-    if not match:
-        return "", ""
-
-    version_number = match.group(1)
-    suffix = match.group(3)
-
-    return version_number, suffix
+    return (match[1], match[3]) if match else ("", "")
 
 
 def _known_microarchitectures():

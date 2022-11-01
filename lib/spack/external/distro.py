@@ -27,6 +27,7 @@ access to OS distribution information is needed. See `Python issue 1322
 <https://bugs.python.org/issue1322>`_ for more information.
 """
 
+
 import argparse
 import json
 import logging
@@ -38,39 +39,6 @@ import sys
 import warnings
 
 __version__ = "1.6.0"
-
-# Use `if False` to avoid an ImportError on Python 2. After dropping Python 2
-# support, can use typing.TYPE_CHECKING instead. See:
-# https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING
-if False:  # pragma: nocover
-    from typing import (
-        Any,
-        Callable,
-        Dict,
-        Iterable,
-        Optional,
-        Sequence,
-        TextIO,
-        Tuple,
-        Type,
-        TypedDict,
-        Union,
-    )
-
-    VersionDict = TypedDict(
-        "VersionDict", {"major": str, "minor": str, "build_number": str}
-    )
-    InfoDict = TypedDict(
-        "InfoDict",
-        {
-            "id": str,
-            "version": str,
-            "version_parts": VersionDict,
-            "like": str,
-            "codename": str,
-        },
-    )
-
 
 _UNIXCONFDIR = os.environ.get("UNIXCONFDIR", "/etc")
 _UNIXUSRLIBDIR = os.environ.get("UNIXUSRLIBDIR", "/usr/lib")
@@ -628,7 +596,7 @@ except ImportError:
 
         def __get__(self, obj, owner):
             # type: (Any, Type[Any]) -> Any
-            assert obj is not None, "call {} on an instance".format(self._fname)
+            assert obj is not None, f"call {self._fname} on an instance"
             ret = obj.__dict__[self._fname] = self._f(obj)
             return ret
 
@@ -812,10 +780,7 @@ class LinuxDistribution(object):
             return normalize(distro_id, NORMALIZED_DISTRO_ID)
 
         distro_id = self.uname_attr("id")
-        if distro_id:
-            return normalize(distro_id, NORMALIZED_DISTRO_ID)
-
-        return ""
+        return normalize(distro_id, NORMALIZED_DISTRO_ID) if distro_id else ""
 
     def name(self, pretty=False):
         # type: (bool) -> str
@@ -836,9 +801,8 @@ class LinuxDistribution(object):
             )
             if not name:
                 name = self.distro_release_attr("name") or self.uname_attr("name")
-                version = self.version(pretty=True)
-                if version:
-                    name = name + " " + version
+                if version := self.version(pretty=True):
+                    name = f"{name} {version}"
         return name or ""
 
     def version(self, pretty=False, best=False):
@@ -886,11 +850,9 @@ class LinuxDistribution(object):
 
         For details, see :func:`distro.version_parts`.
         """
-        version_str = self.version(best=best)
-        if version_str:
+        if version_str := self.version(best=best):
             version_regex = re.compile(r"(\d+)\.?(\d+)?\.?(\d+)?")
-            matches = version_regex.match(version_str)
-            if matches:
+            if matches := version_regex.match(version_str):
                 major, minor, build_number = matches.groups()
                 return major, minor or "", build_number or ""
         return "", "", ""
@@ -1105,10 +1067,6 @@ class LinuxDistribution(object):
             if "=" in token:
                 k, v = token.split("=", 1)
                 props[k.lower()] = v
-            else:
-                # Ignore any tokens that are not variable assignments
-                pass
-
         if "version_codename" in props:
             # os-release added a version_codename field.  Use that in
             # preference to anything else Note that some distros purposefully
@@ -1119,9 +1077,7 @@ class LinuxDistribution(object):
             # Same as above but a non-standard field name used on older Ubuntus
             props["codename"] = props["ubuntu_codename"]
         elif "version" in props:
-            # If there is no version_codename, parse it from the version
-            match = re.search(r"(\(\D+\))|,(\s+)?\D+", props["version"])
-            if match:
+            if match := re.search(r"(\(\D+\))|,(\s+)?\D+", props["version"]):
                 codename = match.group()
                 codename = codename.strip("()")
                 codename = codename.strip(",")
@@ -1174,7 +1130,7 @@ class LinuxDistribution(object):
                 # Ignore lines without colon.
                 continue
             k, v = kv
-            props.update({k.replace(" ", "_").lower(): v.strip()})
+            props[k.replace(" ", "_").lower()] = v.strip()
         return props
 
     @cached_property
@@ -1193,8 +1149,7 @@ class LinuxDistribution(object):
     def _parse_uname_content(lines):
         # type: (Sequence[str]) -> Dict[str, str]
         props = {}
-        match = re.search(r"^([^\s]+)\s+([\d\.]+)", lines[0].strip())
-        if match:
+        if match := re.search(r"^([^\s]+)\s+([\d\.]+)", lines[0].strip()):
             name, version = match.groups()
 
             # This is to prevent the Linux kernel version from
@@ -1216,9 +1171,8 @@ class LinuxDistribution(object):
         if sys.version_info[0] >= 3:
             if isinstance(text, bytes):
                 return text.decode(encoding)
-        else:
-            if isinstance(text, unicode):  # noqa
-                return text.encode(encoding)
+        elif isinstance(text, unicode):  # noqa
+            return text.encode(encoding)
 
         return text
 
@@ -1278,8 +1232,7 @@ class LinuxDistribution(object):
             for basename in basenames:
                 if basename in _DISTRO_RELEASE_IGNORE_BASENAMES:
                     continue
-                match = _DISTRO_RELEASE_BASENAME_PATTERN.match(basename)
-                if match:
+                if match := _DISTRO_RELEASE_BASENAME_PATTERN.match(basename):
                     filepath = os.path.join(self.etc_dir, basename)
                     distro_info = self._parse_distro_release_file(filepath)
                     if "name" in distro_info:

@@ -174,29 +174,27 @@ class TestCaseFunction(Function):
     def runtest(self):
         if self.config.pluginmanager.get_plugin("pdbinvoke") is None:
             self._testcase(result=self)
+        elif self._handle_skip():
+            return
         else:
-            # disables tearDown and cleanups for post mortem debugging (see #1890)
-            if self._handle_skip():
-                return
             self._testcase.debug()
 
     def _prunetraceback(self, excinfo):
         Function._prunetraceback(self, excinfo)
-        traceback = excinfo.traceback.filter(
-            lambda x: not x.frame.f_globals.get('__unittest'))
-        if traceback:
+        if traceback := excinfo.traceback.filter(
+            lambda x: not x.frame.f_globals.get('__unittest')
+        ):
             excinfo.traceback = traceback
 
 
 @hookimpl(tryfirst=True)
 def pytest_runtest_makereport(item, call):
-    if isinstance(item, TestCaseFunction):
-        if item._excinfo:
-            call.excinfo = item._excinfo.pop(0)
-            try:
-                del call.result
-            except AttributeError:
-                pass
+    if isinstance(item, TestCaseFunction) and item._excinfo:
+        call.excinfo = item._excinfo.pop(0)
+        try:
+            del call.result
+        except AttributeError:
+            pass
 
 # twisted trial support
 

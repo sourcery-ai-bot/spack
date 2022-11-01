@@ -27,7 +27,7 @@ class ObjectGraph(object):
         graph.add_node(self, None)
 
     def __repr__(self):
-        return "<%s>" % (type(self).__name__,)
+        return f"<{type(self).__name__}>"
 
     def flatten(self, condition=None, start=None):
         """
@@ -126,18 +126,13 @@ class ObjectGraph(object):
         if ident is not None:
             return ident
         node = self.findNode(node)
-        if node is None:
-            return None
-        return node.graphident
+        return None if node is None else node.graphident
 
     def getRawIdent(self, node):
         """
         Get the identifier for a node object
         """
-        if node is self:
-            return node
-        ident = getattr(node, "graphident", None)
-        return ident
+        return node if node is self else getattr(node, "graphident", None)
 
     def __contains__(self, node):
         return self.findNode(node) is not None
@@ -193,7 +188,7 @@ class ObjectGraph(object):
         Print a debug message with the given level
         """
         if s and level <= self.debug:
-            print("%s%s %s" % ("  " * self.indent, s, " ".join(map(repr, args))))
+            print(f'{"  " * self.indent}{s} {" ".join(map(repr, args))}')
 
     def msgin(self, level, s, *args):
         """

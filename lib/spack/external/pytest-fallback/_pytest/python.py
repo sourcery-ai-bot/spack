@@ -54,8 +54,9 @@ def pyobj_property(name):
         node = self.getparent(getattr(__import__('pytest'), name))
         if node is not None:
             return node.obj
-    doc = "python %s object this node was collected from (can be None)." % (
-          name.lower(),)
+
+    doc = f"python {name.lower()} object this node was collected from (can be None)."
+
     return property(get, None, None, doc)
 
 
@@ -137,9 +138,7 @@ def pytest_pyfunc_call(pyfuncitem):
         testfunction(*pyfuncitem._args)
     else:
         funcargs = pyfuncitem.funcargs
-        testargs = {}
-        for arg in pyfuncitem._fixtureinfo.argnames:
-            testargs[arg] = funcargs[arg]
+        testargs = {arg: funcargs[arg] for arg in pyfuncitem._fixtureinfo.argnames}
         testfunction(**testargs)
     return True
 
@@ -282,7 +281,7 @@ class PyCollector(PyobjMixin, main.Collector):
                 if obj is False:
                     # Python 2.6 wraps in a different way that we won't try to handle
                     msg = "cannot collect static method %r because " \
-                          "it is not a function (always the case in Python 2.6)"
+                              "it is not a function (always the case in Python 2.6)"
                     self.warn(
                         code="C2", message=msg % name)
                     return False
@@ -318,8 +317,10 @@ class PyCollector(PyobjMixin, main.Collector):
         # NB. we avoid random getattrs and peek in the __dict__ instead
         # (XXX originally introduced from a PyPy need, still true?)
         dicts = [getattr(self.obj, '__dict__', {})]
-        for basecls in inspect.getmro(self.obj.__class__):
-            dicts.append(basecls.__dict__)
+        dicts.extend(
+            basecls.__dict__ for basecls in inspect.getmro(self.obj.__class__)
+        )
+
         seen = {}
         values = []
         for dic in dicts:
@@ -369,7 +370,7 @@ class PyCollector(PyobjMixin, main.Collector):
             fixtures.add_funcarg_pseudo_fixture_def(self, metafunc, fm)
 
             for callspec in metafunc._calls:
-                subname = "%s[%s]" % (name, callspec.id)
+                subname = f"{name}[{callspec.id}]"
                 yield Function(name=subname, parent=self,
                                callspec=callspec, callobj=funcobj,
                                fixtureinfo=fixtureinfo,
@@ -461,10 +462,7 @@ def _get_xunit_setup_teardown(holder, attr_name, param_obj=None):
         arg_count = result.__code__.co_argcount
         if inspect.ismethod(result):
             arg_count -= 1
-        if arg_count:
-            return lambda: result(param_obj)
-        else:
-            return result
+        return (lambda: result(param_obj)) if arg_count else result
 
 
 def _get_xunit_func(obj, name):
@@ -547,31 +545,26 @@ class FunctionMixin(PyobjMixin):
             self.addfinalizer(teardown_func_or_method)
 
     def _prunetraceback(self, excinfo):
-        if hasattr(self, '_obj') and not self.config.option.fulltrace:
-            code = _pytest._code.Code(get_real_func(self.obj))
-            path, firstlineno = code.path, code.firstlineno
-            traceback = excinfo.traceback
-            ntraceback = traceback.cut(path=path, firstlineno=firstlineno)
-            if ntraceback == traceback:
-                ntraceback = ntraceback.cut(path=path)
-                if ntraceback == traceback:
-                    # ntraceback = ntraceback.cut(excludepath=cutdir2)
-                    ntraceback = ntraceback.filter(filter_traceback)
-                    if not ntraceback:
-                        ntraceback = traceback
-
-            excinfo.traceback = ntraceback.filter()
+        if not hasattr(self, '_obj') or self.config.option.fulltrace:
+            return
+        code = _pytest._code.Code(get_real_func(self.obj))
+        path, firstlineno = code.path, code.firstlineno
+        traceback = excinfo.traceback
+        ntraceback = traceback.cut(path=path, firstlineno=firstlineno)
+        if ntraceback == traceback:
+            ntraceback = ntraceback.cut(path=path)
+        if ntraceback == traceback:
+            ntraceback = ntraceback.filter(filter_traceback) or traceback
+        excinfo.traceback = ntraceback.filter()
             # issue364: mark all but first and last frames to
             # only show a single-line message for each frame
-            if self.config.option.tbstyle == "auto":
-                if len(excinfo.traceback) > 2:
-                    for entry in excinfo.traceback[1:-1]:
-                        entry.set_repr_style('short')
+        if self.config.option.tbstyle == "auto" and len(excinfo.traceback) > 2:
+            for entry in excinfo.traceback[1:-1]:
+                entry.set_repr_style('short')
 
     def _repr_failure_py(self, excinfo, style="long"):
-        if excinfo.errisinstance(fail.Exception):
-            if not excinfo.value.pytrace:
-                return py._builtin._totext(excinfo.value)
+        if excinfo.errisinstance(fail.Exception) and not excinfo.value.pytrace:
+            return py._builtin._totext(excinfo.value)
         return super(FunctionMixin, self)._repr_failure_py(excinfo,
                                                            style=style)
 
@@ -598,10 +591,7 @@ class Generator(FunctionMixin, PyCollector):
             name, call, args = self.getcallargs(x)
             if not callable(call):
                 raise TypeError("%r yielded non callable test %r" % (self.obj, call,))
-            if name is None:
-                name = "[%d]" % i
-            else:
-                name = "['%s']" % name
+            name = "[%d]" % i if name is None else "['%s']" % name
             if name in seen:
                 raise ValueError("%r generated tests with non-unique name %r" % (self, name))
             seen[name] = True
@@ -623,14 +613,12 @@ class Generator(FunctionMixin, PyCollector):
 
 
 def hasinit(obj):
-    init = getattr(obj, '__init__', None)
-    if init:
+    if init := getattr(obj, '__init__', None):
         return init != object.__init__
 
 
 def hasnew(obj):
-    new = getattr(obj, '__new__', None)
-    if new:
+    if new := getattr(obj, '__new__', None):
         return new != object.__new__
 
 
@@ -899,8 +887,9 @@ def _find_parametrized_scope(argnames, arg2fixturedefs, indirect):
         indirect_as_list and len(indirect) == argnames
     if all_arguments_are_fixtures:
         fixturedefs = arg2fixturedefs or {}
-        used_scopes = [fixturedef[0].scope for name, fixturedef in fixturedefs.items()]
-        if used_scopes:
+        if used_scopes := [
+            fixturedef[0].scope for name, fixturedef in fixturedefs.items()
+        ]:
             # Takes the most narrow scope from used fixtures
             for scope in reversed(scopes):
                 if scope in used_scopes:
@@ -924,9 +913,9 @@ def _idval(val, argname, idx, idfn, config=None):
             return _ascii_escaped(s)
 
     if config:
-        hook_id = config.hook.pytest_make_parametrize_id(
-            config=config, val=val, argname=argname)
-        if hook_id:
+        if hook_id := config.hook.pytest_make_parametrize_id(
+            config=config, val=val, argname=argname
+        ):
             return hook_id
 
     if isinstance(val, STRING_TYPES):
@@ -945,12 +934,11 @@ def _idval(val, argname, idx, idfn, config=None):
 def _idvalset(idx, parameterset, argnames, idfn, ids, config=None):
     if parameterset.id is not None:
         return parameterset.id
-    if ids is None or (idx >= len(ids) or ids[idx] is None):
-        this_id = [_idval(val, argname, idx, idfn, config)
-                   for val, argname in zip(parameterset.values, argnames)]
-        return "-".join(this_id)
-    else:
+    if ids is not None and idx < len(ids) and ids[idx] is not None:
         return _ascii_escaped(ids[idx])
+    this_id = [_idval(val, argname, idx, idfn, config)
+               for val, argname in zip(parameterset.values, argnames)]
+    return "-".join(this_id)
 
 
 def idmaker(argnames, parametersets, idfn=None, ids=None, config=None):
@@ -1057,35 +1045,25 @@ def _showfixtures_main(config, session):
     available.sort()
     currentmodule = None
     for baseid, module, bestrel, argname, fixturedef in available:
-        if currentmodule != module:
-            if not module.startswith("_pytest."):
-                tw.line()
-                tw.sep("-", "fixtures defined from %s" % (module,))
-                currentmodule = module
+        if currentmodule != module and not module.startswith("_pytest."):
+            tw.line()
+            tw.sep("-", f"fixtures defined from {module}")
+            currentmodule = module
         if verbose <= 0 and argname[0] == "_":
             continue
-        if verbose > 0:
-            funcargspec = "%s -- %s" % (argname, bestrel,)
-        else:
-            funcargspec = argname
+        funcargspec = f"{argname} -- {bestrel}" if verbose > 0 else argname
         tw.line(funcargspec, green=True)
         loc = getlocation(fixturedef.func, curdir)
-        doc = fixturedef.func.__doc__ or ""
-        if doc:
+        if doc := fixturedef.func.__doc__ or "":
             write_docstring(tw, doc)
         else:
-            tw.line("    %s: no docstring available" % (loc,),
-                    red=True)
+            tw.line(f"    {loc}: no docstring available", red=True)
 
 
 def write_docstring(tw, doc):
     INDENT = "    "
     doc = doc.rstrip()
-    if "\n" in doc:
-        firstline, rest = doc.split("\n", 1)
-    else:
-        firstline, rest = doc, ""
-
+    firstline, rest = doc.split("\n", 1) if "\n" in doc else (doc, "")
     if firstline.strip():
         tw.line(INDENT + firstline.strip())
 
@@ -1135,13 +1113,12 @@ class Function(FunctionMixin, main.Item, fixtures.FuncargnamesCompatAttr):
         if self._isyieldedfunction():
             assert not hasattr(self, "callspec"), (
                 "yielded functions (deprecated) cannot have funcargs")
-        else:
-            if hasattr(self, "callspec"):
-                callspec = self.callspec
-                assert not callspec.funcargs
-                self._genid = callspec.id
-                if hasattr(callspec, "param"):
-                    self.param = callspec.param
+        elif hasattr(self, "callspec"):
+            callspec = self.callspec
+            assert not callspec.funcargs
+            self._genid = callspec.id
+            if hasattr(callspec, "param"):
+                self.param = callspec.param
         self._request = fixtures.FixtureRequest(self)
 
     @property

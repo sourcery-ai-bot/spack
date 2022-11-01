@@ -73,9 +73,7 @@ else:
         return cls
 
     def encode_filename(filename):
-        if isinstance(filename, unicode):
-            return filename.encode("utf-8")
-        return filename
+        return filename.encode("utf-8") if isinstance(filename, unicode) else filename
 
     def marshal_dump(code, f):
         if isinstance(f, file):
@@ -84,9 +82,7 @@ else:
             f.write(marshal.dumps(code))
 
     def marshal_load(f):
-        if isinstance(f, file):
-            return marshal.load(f)
-        return marshal.loads(f.read())
+        return marshal.load(f) if isinstance(f, file) else marshal.loads(f.read())
 
 
 def with_metaclass(meta, *bases):

@@ -41,10 +41,10 @@ class View(object):
     _viewcache = {}
     __view__ = ()
 
-    def __new__(rootclass, obj, *args, **kwds):
-        self = object.__new__(rootclass)
+    def __new__(cls, obj, *args, **kwds):
+        self = object.__new__(cls)
         self.__obj__ = obj
-        self.__rootclass__ = rootclass
+        self.__rootclass__ = cls
         key = self.__viewkey__()
         try:
             self.__class__ = self._viewcache[key]
@@ -61,13 +61,9 @@ class View(object):
         return self.__obj__.__class__
 
     def __matchkey__(self, key, subclasses):
-        if inspect.isclass(key):
-            keys = inspect.getmro(key)
-        else:
-            keys = [key]
+        keys = inspect.getmro(key) if inspect.isclass(key) else [key]
         for key in keys:
-            result = [C for C in subclasses if key in C.__view__]
-            if result:
+            if result := [C for C in subclasses if key in C.__view__]:
                 return result
         return []
 
@@ -91,8 +87,7 @@ class View(object):
 
 def enumsubclasses(cls):
     for subcls in cls.__subclasses__():
-        for subsubclass in enumsubclasses(subcls):
-            yield subsubclass
+        yield from enumsubclasses(subcls)
     yield cls
 
 
@@ -177,15 +172,12 @@ class Compare(Interpretable):
         expr = Interpretable(self.expr)
         expr.eval(frame)
         for operation, expr2 in self.ops:
-            if hasattr(self, 'result'):
-                # shortcutting in chained expressions
-                if not frame.is_true(self.result):
-                    break
+            if hasattr(self, 'result') and not frame.is_true(self.result):
+                break
             expr2 = Interpretable(expr2)
             expr2.eval(frame)
-            self.explanation = "%s %s %s" % (
-                expr.explanation, operation, expr2.explanation)
-            source = "__exprinfo_left %s __exprinfo_right" % operation
+            self.explanation = f"{expr.explanation} {operation} {expr2.explanation}"
+            source = f"__exprinfo_left {operation} __exprinfo_right"
             try:
                 self.result = frame.eval(source,
                                          __exprinfo_left=expr.result,
@@ -313,27 +305,26 @@ class CallFunc(Interpretable):
             argname = '__exprinfo_%d' % len(vars)
             vars[argname] = a.result
             if keyword is None:
-                source += argname + ','
+                source += f'{argname},'
                 explanations.append(a.explanation)
             else:
-                source += '%s=%s,' % (keyword, argname)
-                explanations.append('%s=%s' % (keyword, a.explanation))
+                source += f'{keyword}={argname},'
+                explanations.append(f'{keyword}={a.explanation}')
         if self.star_args:
             star_args = Interpretable(self.star_args)
             star_args.eval(frame)
             argname = '__exprinfo_star'
             vars[argname] = star_args.result
-            source += '*' + argname + ','
-            explanations.append('*' + star_args.explanation)
+            source += f'*{argname},'
+            explanations.append(f'*{star_args.explanation}')
         if self.dstar_args:
             dstar_args = Interpretable(self.dstar_args)
             dstar_args.eval(frame)
             argname = '__exprinfo_kwds'
             vars[argname] = dstar_args.result
-            source += '**' + argname + ','
-            explanations.append('**' + dstar_args.explanation)
-        self.explanation = "%s(%s)" % (
-            node.explanation, ', '.join(explanations))
+            source += f'**{argname},'
+            explanations.append(f'**{dstar_args.explanation}')
+        self.explanation = f"{node.explanation}({', '.join(explanations)})"
         if source.endswith(','):
             source = source[:-1]
         source += ')'
@@ -353,14 +344,14 @@ class Getattr(Interpretable):
     def eval(self, frame):
         expr = Interpretable(self.expr)
         expr.eval(frame)
-        source = '__exprinfo_expr.%s' % self.attrname
+        source = f'__exprinfo_expr.{self.attrname}'
         try:
             self.result = frame.eval(source, __exprinfo_expr=expr.result)
         except passthroughex:
             raise
         except:
             raise Failure(self)
-        self.explanation = '%s.%s' % (expr.explanation, self.attrname)
+        self.explanation = f'{expr.explanation}.{self.attrname}'
         # if the attribute comes from the instance, its value is interesting
         source = ('hasattr(__exprinfo_expr, "__dict__") and '
                   '%r in __exprinfo_expr.__dict__' % self.attrname)
@@ -389,7 +380,7 @@ class Assert(Interpretable):
             test.explanation = test.explanation[15:-2]
         # print the result as  'assert <explanation>'
         self.result = test.result
-        self.explanation = 'assert ' + test.explanation
+        self.explanation = f'assert {test.explanation}'
         if not frame.is_true(test.result):
             try:
                 raise BuiltinAssertionError
@@ -405,7 +396,7 @@ class Assign(Interpretable):
         expr = Interpretable(self.expr)
         expr.eval(frame)
         self.result = expr.result
-        self.explanation = '... = ' + expr.explanation
+        self.explanation = f'... = {expr.explanation}'
         # fall-back-run the rest of the assignment
         ass = ast.Assign(self.nodes, ast.Name('__exprinfo_expr'))
         mod = ast.Module(None, ast.Stmt([ass]))
@@ -438,10 +429,7 @@ class Stmt(Interpretable):
 
 def report_failure(e):
     explanation = e.node.nice_explanation()
-    if explanation:
-        explanation = ", in: " + explanation
-    else:
-        explanation = ""
+    explanation = f", in: {explanation}" if explanation else ""
     sys.stdout.write("%s: %s%s\n" % (e.exc.__name__, e.value, explanation))
 
 def check(s, frame=None):
@@ -507,9 +495,9 @@ def getfailure(e):
     explanation = e.node.nice_explanation()
     if str(e.value):
         lines = explanation.split('\n')
-        lines[0] += "  << %s" % (e.value,)
+        lines[0] += f"  << {e.value}"
         explanation = '\n'.join(lines)
-    text = "%s: %s" % (e.exc.__name__, explanation)
+    text = f"{e.exc.__name__}: {explanation}"
     if text.startswith('AssertionError: assert '):
         text = text[16:]
     return text

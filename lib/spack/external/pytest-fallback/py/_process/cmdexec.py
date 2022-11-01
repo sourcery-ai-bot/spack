@@ -23,8 +23,7 @@ def cmdexec(cmd):
             default_encoding = sys.stdout.encoding or 'UTF-8'
         out = unicode(out, process.stdout.encoding or default_encoding)
         err = unicode(err, process.stderr.encoding or default_encoding)
-    status = process.poll()
-    if status:
+    if status := process.poll():
         raise ExecutionFailed(status, status, cmd, out, err)
     return out
 

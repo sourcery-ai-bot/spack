@@ -46,10 +46,9 @@ def deprecated_call(func=None, *args, **kwargs):
     """
     if not func:
         return _DeprecatedCallContext()
-    else:
-        __tracebackhide__ = True
-        with _DeprecatedCallContext():
-            return func(*args, **kwargs)
+    __tracebackhide__ = True
+    with _DeprecatedCallContext():
+        return func(*args, **kwargs)
 
 
 class _DeprecatedCallContext(object):
@@ -194,12 +193,15 @@ class WarningsChecker(WarningsRecorder):
         super(WarningsChecker, self).__exit__(*exc_info)
 
         # only check if we're not currently handling an exception
-        if all(a is None for a in exc_info):
-            if self.expected_warning is not None:
-                if not any(issubclass(r.category, self.expected_warning)
-                           for r in self):
-                    __tracebackhide__ = True
-                    fail("DID NOT WARN. No warnings of type {0} was emitted. "
-                         "The list of emitted warnings is: {1}.".format(
-                             self.expected_warning,
-                             [each.message for each in self]))
+        if (
+            all(a is None for a in exc_info)
+            and self.expected_warning is not None
+            and not any(
+                issubclass(r.category, self.expected_warning) for r in self
+            )
+        ):
+            __tracebackhide__ = True
+            fail("DID NOT WARN. No warnings of type {0} was emitted. "
+                 "The list of emitted warnings is: {1}.".format(
+                     self.expected_warning,
+                     [each.message for each in self]))

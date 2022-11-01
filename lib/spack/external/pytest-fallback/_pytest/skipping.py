@@ -77,10 +77,10 @@ class MarkEvaluator:
         return not hasattr(self, 'exc')
 
     def invalidraise(self, exc):
-        raises = self.get('raises')
-        if not raises:
+        if raises := self.get('raises'):
+            return not isinstance(exc, raises)
+        else:
             return
-        return not isinstance(exc, raises)
 
     def istrue(self):
         try:
@@ -88,8 +88,7 @@ class MarkEvaluator:
         except TEST_OUTCOME:
             self.exc = sys.exc_info()
             if isinstance(self.exc[1], SyntaxError):
-                msg = [" " * (self.exc[1].offset + 4) + "^", ]
-                msg.append("SyntaxError: invalid syntax")
+                msg = [" " * (self.exc[1].offset + 4) + "^", "SyntaxError: invalid syntax"]
             else:
                 msg = traceback.format_exception_only(*self.exc[:2])
             fail("Error evaluating %r expression\n"
@@ -101,7 +100,7 @@ class MarkEvaluator:
     def _getglobals(self):
         d = {'os': os, 'sys': sys, 'config': self.item.config}
         if hasattr(self.item, 'obj'):
-            d.update(self.item.obj.__globals__)
+            d |= self.item.obj.__globals__
         return d
 
     def _istrue(self):
@@ -114,7 +113,7 @@ class MarkEvaluator:
                 # MarkInfo keeps track of all parameters it received in an
                 # _arglist attribute
                 marks = getattr(self.holder, '_marks', None) \
-                    or [self.holder.mark]
+                        or [self.holder.mark]
                 for _, args, kwargs in marks:
                     if 'condition' in kwargs:
                         args = (kwargs['condition'],)
@@ -127,7 +126,7 @@ class MarkEvaluator:
                             if "reason" not in kwargs:
                                 # XXX better be checked at collection time
                                 msg = "you need to specify reason=STRING " \
-                                      "when using booleans as conditions."
+                                          "when using booleans as conditions."
                                 fail(msg)
                             result = bool(expr)
                         if result:
@@ -143,13 +142,10 @@ class MarkEvaluator:
         return self.holder.kwargs.get(attr, default)
 
     def getexplanation(self):
-        expl = getattr(self, 'reason', None) or self.get('reason', None)
-        if not expl:
-            if not hasattr(self, 'expr'):
-                return ""
-            else:
-                return "condition: " + str(self.expr)
-        return expl
+        if expl := getattr(self, 'reason', None) or self.get('reason', None):
+            return expl
+        else:
+            return f"condition: {str(self.expr)}" if hasattr(self, 'expr') else ""
 
 
 @hookimpl(tryfirst=True)
@@ -190,9 +186,8 @@ def check_xfail_no_run(item):
     """check xfail(run=False)"""
     if not item.config.option.runxfail:
         evalxfail = item._evalxfail
-        if evalxfail.istrue():
-            if not evalxfail.get('run', True):
-                xfail("[NOTRUN] " + evalxfail.getexplanation())
+        if evalxfail.istrue() and not evalxfail.get('run', True):
+            xfail(f"[NOTRUN] {evalxfail.getexplanation()}")
 
 
 def check_strict_xfail(pyfuncitem):
@@ -200,11 +195,10 @@ def check_strict_xfail(pyfuncitem):
     evalxfail = pyfuncitem._evalxfail
     if evalxfail.istrue():
         strict_default = pyfuncitem.config.getini('xfail_strict')
-        is_strict_xfail = evalxfail.get('strict', strict_default)
-        if is_strict_xfail:
+        if is_strict_xfail := evalxfail.get('strict', strict_default):
             del pyfuncitem._evalxfail
             explanation = evalxfail.getexplanation()
-            fail('[XPASS(strict)] ' + explanation, pytrace=False)
+            fail(f'[XPASS(strict)] {explanation}', pytrace=False)
 
 
 @hookimpl(hookwrapper=True)
@@ -228,7 +222,7 @@ def pytest_runtest_makereport(item, call):
     elif item.config.option.runxfail:
         pass   # don't interefere
     elif call.excinfo and call.excinfo.errisinstance(xfail.Exception):
-        rep.wasxfail = "reason: " + call.excinfo.value.msg
+        rep.wasxfail = f"reason: {call.excinfo.value.msg}"
         rep.outcome = "skipped"
     elif evalxfail and not rep.skipped and evalxfail.wasvalid() and \
             evalxfail.istrue():
@@ -301,31 +295,28 @@ def pytest_terminal_summary(terminalreporter):
 
 
 def show_simple(terminalreporter, lines, stat, format):
-    failed = terminalreporter.stats.get(stat)
-    if failed:
+    if failed := terminalreporter.stats.get(stat):
         for rep in failed:
             pos = terminalreporter.config.cwd_relative_nodeid(rep.nodeid)
             lines.append(format % (pos,))
 
 
 def show_xfailed(terminalreporter, lines):
-    xfailed = terminalreporter.stats.get("xfailed")
-    if xfailed:
+    if xfailed := terminalreporter.stats.get("xfailed"):
         for rep in xfailed:
             pos = terminalreporter.config.cwd_relative_nodeid(rep.nodeid)
             reason = rep.wasxfail
-            lines.append("XFAIL %s" % (pos,))
+            lines.append(f"XFAIL {pos}")
             if reason:
-                lines.append("  " + str(reason))
+                lines.append(f"  {str(reason)}")
 
 
 def show_xpassed(terminalreporter, lines):
-    xpassed = terminalreporter.stats.get("xpassed")
-    if xpassed:
+    if xpassed := terminalreporter.stats.get("xpassed"):
         for rep in xpassed:
             pos = terminalreporter.config.cwd_relative_nodeid(rep.nodeid)
             reason = rep.wasxfail
-            lines.append("XPASS %s %s" % (pos, reason))
+            lines.append(f"XPASS {pos} {reason}")
 
 
 def cached_eval(config, expr, d):
@@ -346,23 +337,13 @@ def folded_skips(skipped):
         key = event.longrepr
         assert len(key) == 3, (event, key)
         d.setdefault(key, []).append(event)
-    values = []
-    for key, events in d.items():
-        values.append((len(events),) + key)
-    return values
+    return [(len(events),) + key for key, events in d.items()]
 
 
 def show_skipped(terminalreporter, lines):
     tr = terminalreporter
-    skipped = tr.stats.get('skipped', [])
-    if skipped:
-        # if not tr.hasopt('skipped'):
-        #    tr.write_line(
-        #        "%d skipped tests, specify -rs for more info" %
-        #        len(skipped))
-        #    return
-        fskips = folded_skips(skipped)
-        if fskips:
+    if skipped := tr.stats.get('skipped', []):
+        if fskips := folded_skips(skipped):
             # tr.write_sep("_", "skipped test summary")
             for num, fspath, lineno, reason in fskips:
                 if reason.startswith("Skipped: "):

@@ -60,8 +60,7 @@ def catch_warnings_for_item(item):
         for arg in inifilters:
             _setoption(warnings, arg)
 
-        mark = item.get_marker('filterwarnings')
-        if mark:
+        if mark := item.get_marker('filterwarnings'):
             for arg in mark.args:
                 warnings._setoption(arg)
 

@@ -45,9 +45,7 @@ def escape_silent(s):
     >>> escape_silent(None)
     Markup('')
     """
-    if s is None:
-        return Markup()
-    return escape(s)
+    return Markup() if s is None else escape(s)
 
 
 def soft_unicode(s):

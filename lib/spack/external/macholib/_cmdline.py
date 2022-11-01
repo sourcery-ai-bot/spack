@@ -11,16 +11,14 @@ from macholib.util import is_platform_file
 
 def check_file(fp, path, callback):
     if not os.path.exists(path):
-        print(
-            "%s: %s: No such file or directory" % (sys.argv[0], path), file=sys.stderr
-        )
+        print(f"{sys.argv[0]}: {path}: No such file or directory", file=sys.stderr)
         return 1
 
     try:
         is_plat = is_platform_file(path)
 
     except IOError as msg:
-        print("%s: %s: %s" % (sys.argv[0], path, msg), file=sys.stderr)
+        print(f"{sys.argv[0]}: {path}: {msg}", file=sys.stderr)
         return 1
 
     else:
@@ -35,7 +33,7 @@ def main(callback):
     err = 0
 
     if not args:
-        print("Usage: %s filename..." % (name,), file=sys.stderr)
+        print(f"Usage: {name} filename...", file=sys.stderr)
         return 1
 
     for base in args:
